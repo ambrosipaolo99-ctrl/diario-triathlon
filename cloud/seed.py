@@ -54,8 +54,12 @@ def main() -> None:
         root = Path(tmp) / "state"
         (root / "data").mkdir(parents=True)
         # copia coerente del database anche se e' aperto altrove
-        with sqlite3.connect(DATA_DIR / "garmin.db") as src, sqlite3.connect(root / "data" / "garmin.db") as dst:
+        src, dst = sqlite3.connect(DATA_DIR / "garmin.db"), sqlite3.connect(root / "data" / "garmin.db")
+        try:
             src.backup(dst)
+        finally:
+            src.close()
+            dst.close()          # chiuse, altrimenti su Windows la copia in chiaro non si cancella
         shutil.copy2(DATA_DIR / "goals.json", root / "data" / "goals.json")
         (root / "carica_img.json").write_text(json.dumps(carica_images()), encoding="utf-8")
 
