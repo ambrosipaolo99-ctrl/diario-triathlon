@@ -86,8 +86,9 @@ def login_with_tokens() -> Optional[Garmin]:
 
 
 def _get_credentials() -> tuple[str, str]:
-    email = os.getenv("GARMIN_EMAIL") or input("Email Garmin Connect: ").strip()
-    password = os.getenv("GARMIN_PASSWORD") or getpass.getpass("Password Garmin Connect: ")
+    # spazi e "a capo" agli estremi arrivano spesso incollando (o premendo Invio nei segreti di GitHub)
+    email = (os.getenv("GARMIN_EMAIL") or input("Email Garmin Connect: ")).strip()
+    password = (os.getenv("GARMIN_PASSWORD") or getpass.getpass("Password Garmin Connect: ")).strip()
     if not email or not password:
         raise AuthError("Credenziali mancanti.")
     return email, password
@@ -101,7 +102,7 @@ def _login_with_credentials(interactive: bool) -> Garmin:
             f"Cooldown attivo dopo un rate limit: attendi ancora {remaining // 60} min "
             f"(o elimina {COOLDOWN_FILE} se sai cosa stai facendo)."
         )
-    if not interactive and not (os.getenv("GARMIN_EMAIL") and os.getenv("GARMIN_PASSWORD")):
+    if not interactive and not ((os.getenv("GARMIN_EMAIL") or "").strip() and (os.getenv("GARMIN_PASSWORD") or "").strip()):
         raise AuthError("Token non validi e modalita' non interattiva: esegui 'python main.py login'.")
 
     email, password = _get_credentials()

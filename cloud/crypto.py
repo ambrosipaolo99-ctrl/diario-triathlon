@@ -51,6 +51,7 @@ def open_state(blob: bytes, key: bytes) -> bytes:
 
 
 def data_key(passphrase: str | None, salt: bytes, iterations: int = PBKDF2_ITERATIONS) -> bytes:
+    passphrase = (passphrase or "").strip()      # come fa il telefono: niente spazi o "a capo" agli estremi
     if not passphrase or len(passphrase) < MIN_PASSPHRASE:
         raise CryptoError(f"DATA_PASSPHRASE mancante o piu' corta di {MIN_PASSPHRASE} caratteri")
     kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations)

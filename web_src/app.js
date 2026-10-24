@@ -188,7 +188,7 @@
 
   async function unlock(ev) {
     ev.preventDefault();
-    const pass = $('lock-pass').value;
+    const pass = $('lock-pass').value.trim();   // come il server: niente spazi agli estremi
     if (!pending || !pass) return;
     const btn = $('lock-go');
     btn.disabled = true; $('lock-msg').textContent = 'Verifica…';
