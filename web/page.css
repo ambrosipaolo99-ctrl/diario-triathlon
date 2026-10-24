@@ -1,0 +1,52 @@
+.gx { font-family: var(--font-anthropic-sans); display: flex; flex-direction: column; gap: var(--cds-gap-lg); }
+.gx-head h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; text-wrap: balance; }
+.gx-take { color: var(--color-fg-muted); margin: var(--cds-gap-xs) 0 0; font-size: var(--cds-font-size-body); }
+.gx-tabs { display: flex; gap: var(--cds-gap-xs); flex-wrap: wrap; border-bottom: 1px solid var(--color-border-line); }
+.gx-tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: var(--cds-pad-sm) var(--cds-pad-md); font: inherit; color: var(--color-fg-muted); cursor: pointer; }
+.gx-tab[aria-selected="true"] { color: var(--color-fg); border-bottom-color: var(--color-fg); }
+.gx-tab:focus-visible, .gx-chip:focus-visible, .gx-table tbody tr:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; }
+.gx-page { display: flex; flex-direction: column; gap: var(--cds-gap-md); }
+.gx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: var(--cds-gap-md); }
+.gx-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); min-width: 0; display: flex; flex-direction: column; gap: var(--cds-gap-sm); }
+.gx-card h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0; }
+.gx-note { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: 0; }
+.gx-hero { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--cds-gap-lg); }
+.gx-big { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: 4rem; line-height: 1; }
+.gx-big small { font-size: var(--cds-font-size-heading); color: var(--color-fg-muted); }
+.gx-label { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); }
+.gx-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: var(--cds-gap-md); }
+.gx-tile { display: flex; flex-direction: column; gap: var(--cds-gap-xs); padding: var(--cds-pad-md); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); min-width: 0; }
+.gx-tile-name { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.gx-tile-score { font-family: var(--font-anthropic-serif); font-size: var(--cds-font-size-title); font-weight: 400; }
+.gx-tile-raw { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+.gx-meter { height: 4px; border-radius: 2px; background: var(--cds-chart-grid); overflow: hidden; }
+.gx-meter > span { display: block; height: 100%; border-radius: 2px; background: var(--cds-chart-muted); }
+.gx-ok { color: var(--color-ok); } .gx-warn { color: var(--color-warn); } .gx-bad { color: var(--color-bad); }
+.gx-chart { position: relative; min-height: 200px; }
+.gx-chart svg { display: block; overflow: visible; }
+.gx-tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); white-space: nowrap; z-index: 2; }
+.gx-tip .d { color: var(--cds-text-secondary); }
+.gx-tip .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
+.gx-chips { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs); align-items: center; }
+.gx-chip { font: inherit; font-size: var(--cds-font-size-caption); padding: var(--cds-pad-xs) var(--cds-pad-sm); border: 1px solid var(--color-border-line); border-radius: 999px; background: none; color: var(--color-fg-muted); cursor: pointer; }
+.gx-chip[aria-pressed="true"] { color: var(--color-fg); border-color: var(--color-fg); }
+.gx-search { font: inherit; font-size: var(--cds-font-size-caption); padding: var(--cds-pad-xs) var(--cds-pad-sm); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: none; color: var(--color-fg); min-width: 0; flex: 1 1 10rem; max-width: 16rem; }
+.gx-tablebox { max-height: 30rem; overflow: auto; }
+.gx-table { width: 100%; border-collapse: collapse; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+.gx-table th { position: sticky; top: 0; background: var(--color-panel); text-align: left; font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); white-space: nowrap; }
+.gx-table th button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.gx-table td { padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); white-space: nowrap; }
+.gx-table td.num, .gx-table th.num { text-align: right; }
+.gx-table td.wrap { white-space: normal; min-width: 10rem; }
+.gx-table tbody tr.sel { background: var(--cds-chart-grid); }
+.gx-acts tbody tr { cursor: pointer; }
+.gx-dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr)); gap: var(--cds-gap-sm) var(--cds-gap-md); margin: 0; }
+.gx-dl div { display: flex; flex-direction: column; min-width: 0; }
+.gx-dl dt { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.gx-dl dd { margin: 0; font-variant-numeric: tabular-nums; }
+.gx-detail-score { font-family: var(--font-anthropic-serif); font-size: 3rem; font-weight: 400; line-height: 1; }
+.gx-fail { display: flex; align-items: center; justify-content: center; gap: var(--cds-gap-xs); min-height: inherit; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.gx-fail::before { content: ""; width: .375rem; height: .375rem; border-radius: 50%; background: var(--color-bad); }
+[data-dash-source-state="empty"] { color: transparent; }
+[data-dash-source-state="refreshing"] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+@media (max-width: 40rem) { .gx-hide-narrow { display: none; } .gx-big { font-size: 3rem; } }

@@ -1,0 +1,109 @@
+name: Sincronizzazione
+
+# Parte solo all'orario fissato o a mano dal proprietario: mai da pull request o contributi esterni.
+on:
+  schedule:
+    - cron: "15 5 * * *"     # 07:15 ora legale italiana (06:15 solare): recupero del mattino
+    - cron: "15 17 * * *"    # 19:15 ora legale (18:15 solare): allenamenti del giorno
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: sincronizzazione
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write          # solo per lo stato cifrato nella release "state"
+    outputs:
+      site: ${{ steps.site.outcome }}
+    steps:
+      # azioni fissate al commit (un tag puo' essere spostato), nessuna credenziale lasciata nel checkout
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Dipendenze (versioni e hash verificati)
+        run: python -m pip install --quiet --disable-pip-version-check --require-hashes --no-deps -r cloud/requirements.txt
+
+      - name: Scarica lo stato cifrato
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          name=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/state" \
+            --jq '[.assets[] | select(.name | startswith("state-"))] | sort_by(.created_at) | last | .name')
+          test -n "$name"
+          gh release download state -p "$name" -O "$RUNNER_TEMP/state.bin" -R "$GITHUB_REPOSITORY"
+
+      - name: Sincronizzazione e calcolo
+        id: run
+        continue-on-error: true
+        env:
+          STATE_KEY: ${{ secrets.STATE_KEY }}
+          DATA_PASSPHRASE: ${{ secrets.DATA_PASSPHRASE }}
+          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          GARMIN_DATA_DIR: ${{ runner.temp }}/state/data
+          GARMIN_TOKEN_DIR: ${{ runner.temp }}/state/tokens
+          TZ: Europe/Rome
+        # nessun output del programma nel log pubblico: solo l'esito per fase
+        run: |
+          set +e
+          python -m cloud.run --state-in "$RUNNER_TEMP/state.bin" --state-out "$RUNNER_TEMP/state.new" \
+            --data-out "$RUNNER_TEMP/site/data.bin" --status "$RUNNER_TEMP/status.txt" > /dev/null 2>&1
+          code=$?
+          cat "$RUNNER_TEMP/status.txt" 2>/dev/null || echo "ERRORE  avvio"
+          exit $code
+
+      - name: Salva lo stato (ultime 3 copie)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -s "$RUNNER_TEMP/state.new" ]; then echo "stato non aggiornato"; exit 0; fi
+          name="state-$(date -u +%Y%m%dT%H%M%S).bin"
+          mv "$RUNNER_TEMP/state.new" "$RUNNER_TEMP/$name"
+          gh release upload state "$RUNNER_TEMP/$name" -R "$GITHUB_REPOSITORY"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/state" \
+            --jq '[.assets[] | select(.name | startswith("state-"))] | sort_by(.created_at) | reverse | .[3:] | .[].id' |
+            while read -r id; do gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$id" > /dev/null; done
+
+      - name: Prepara il sito
+        id: site
+        run: |
+          test -s "$RUNNER_TEMP/site/data.bin"
+          cp -r web/. "$RUNNER_TEMP/site/"
+
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        if: steps.site.outcome == 'success'
+        with:
+          path: ${{ runner.temp }}/site
+
+      - name: Esito
+        if: steps.run.outcome == 'failure'
+        run: |
+          echo "Una o piu' fasi sono fallite: i dettagli sono nel registro cifrato dentro l'app."
+          exit 1
+
+  deploy:
+    needs: sync
+    if: always() && needs.sync.outputs.site == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

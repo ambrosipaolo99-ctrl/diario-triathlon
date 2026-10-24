@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#070a12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Diario">
+<title>Diario Triathlon</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="neon.css">
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<div id="lock">
+  <form id="lock-form" class="lock-card" autocomplete="on">
+    <svg class="lock-logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h4l2.5-5 4 10 2.5-5H22"/></svg>
+    <h1>Diario Triathlon</h1>
+    <p class="lock-text">Inserisci la frase segreta per sbloccare i tuoi dati su questo dispositivo.</p>
+    <input class="sr-only" type="text" name="username" autocomplete="username" value="diario-triathlon" tabindex="-1" aria-hidden="true">
+    <label class="sr-only" for="lock-pass">Frase segreta</label>
+    <input id="lock-pass" name="password" type="password" autocomplete="current-password" required minlength="20" placeholder="Frase segreta" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button id="lock-go" type="submit">Sblocca</button>
+    <p id="lock-msg" role="status">Caricamento…</p>
+    <p class="lock-note">La frase non viene mai inviata: i dati si decifrano solo su questo dispositivo.</p>
+  </form>
+</div>
+<div id="app" hidden>
+  <div id="dash-root">
+<div class="gx nx nx-root">
+  <header class="gx-head" id="top">
+    <h1>Diario Triathlon</h1>
+    <p class="gx-take gx-take-text dash-skeleton">Recupero di oggi: <span class="gx-take-label" data-source="wellness" data-field="recovery_label">—</span>. Il fattore che pesa di più è <span class="gx-take-lim" data-source="wellness" data-field="limiter_label">—</span>.</p>
+  </header>
+
+  <nav class="gx-tabs" role="tablist" aria-label="Sezioni">
+    <button class="gx-tab" role="tab" id="tab-oggi" data-page="oggi" data-icon="sun" data-icon-tone="cyan" aria-selected="true">Oggi</button>
+    <button class="gx-tab" role="tab" id="tab-obiettivo" data-page="obiettivo" data-icon="target" data-icon-tone="magenta" aria-selected="false">Obiettivo</button>
+    <button class="gx-tab" role="tab" id="tab-recupero" data-page="recupero" data-icon="heart" data-icon-tone="pink" aria-selected="false">Recupero</button>
+    <button class="gx-tab" role="tab" id="tab-allenamenti" data-page="allenamenti" data-icon="list" data-icon-tone="lime" aria-selected="false">Allenamenti</button>
+    <button class="gx-tab" role="tab" id="tab-progressi" data-page="progressi" data-icon="trend" data-icon-tone="violet" aria-selected="false">Progressi</button>
+  </nav>
+
+  <!-- OGGI -->
+  <section class="gx-page" id="oggi" role="tabpanel" aria-labelledby="tab-oggi">
+    <div class="td-wrap" id="allenamenti-oggi" data-source="today today_parts" hidden></div>
+    <div class="ck-wrap" id="carica-oggi" data-source="goal_plan goals"></div>
+    <div class="gx-card gl-today-card" id="obiettivo-oggi" data-source="goals race_estimate goal_plan">
+      <h2>Obiettivo</h2>
+      <div class="gl-today-body"><span class="dash-skeleton">—</span></div>
+    </div>
+    <div class="gx-card" id="recupero-oggi">
+      <h2>Indice di recupero</h2>
+      <p class="gx-note"><span class="gx-today-date" data-source="wellness" data-field="date">—</span> · HRV, sonno, FC a riposo, Body Battery e stress confrontati con la tua media degli ultimi 60 giorni</p>
+      <div class="gx-hero">
+        <div class="nx-ring gx-today-ring"><div class="nx-ring-val"><b class="gx-today-rec dash-skeleton" data-source="wellness" data-field="recovery">—</b><span>/100</span></div></div>
+        <div>
+          <div class="gx-label gx-today-label" data-source="wellness" data-field="recovery_label">—</div>
+          <div class="gx-note">Fattore limitante: <span class="gx-today-lim" data-source="wellness" data-field="limiter_label">—</span></div>
+        </div>
+      </div>
+      <div class="gx-tiles" id="componenti-recupero">
+        <div class="gx-tile" data-comp="hrv"><span class="gx-tile-name">HRV · peso 30%</span><span class="gx-tile-score" data-source="wellness" data-field="c_hrv">—</span><div class="gx-meter"><span></span></div><span class="gx-tile-raw"><span data-source="wellness" data-field="hrv">—</span> ms · media 7 gg <span data-source="wellness" data-field="hrv_7d">—</span></span></div>
+        <div class="gx-tile" data-comp="sleep"><span class="gx-tile-name">Sonno · peso 25%</span><span class="gx-tile-score" data-source="wellness" data-field="c_sleep">—</span><div class="gx-meter"><span></span></div><span class="gx-tile-raw">Sleep Score <span data-source="wellness" data-field="sleep_score">—</span> · <span data-source="wellness" data-field="sleep_h">—</span> h</span></div>
+        <div class="gx-tile" data-comp="rhr"><span class="gx-tile-name">FC a riposo · peso 15%</span><span class="gx-tile-score" data-source="wellness" data-field="c_rhr">—</span><div class="gx-meter"><span></span></div><span class="gx-tile-raw"><span data-source="wellness" data-field="rhr">—</span> bpm</span></div>
+        <div class="gx-tile" data-comp="body_battery"><span class="gx-tile-name">Body Battery · peso 15%</span><span class="gx-tile-score" data-source="wellness" data-field="c_body_battery">—</span><div class="gx-meter"><span></span></div><span class="gx-tile-raw">al risveglio <span data-source="wellness" data-field="body_battery">—</span></span></div>
+        <div class="gx-tile" data-comp="stress"><span class="gx-tile-name">Stress · peso 15%</span><span class="gx-tile-score" data-source="wellness" data-field="c_stress">—</span><div class="gx-meter"><span></span></div><span class="gx-tile-raw">media giorno <span data-source="wellness" data-field="stress">—</span></span></div>
+      </div>
+    </div>
+    <div class="gx-grid">
+      <div class="gx-card" id="forma-oggi">
+        <h2>Carico di oggi</h2>
+        <p class="gx-note">TSS: cronico = media esponenziale 42 gg, acuto = 7 gg</p>
+        <dl class="gx-dl">
+          <div><dt>Cronico (CTL)</dt><dd class="gx-tile-score" data-source="load" data-field="ctl">—</dd></div>
+          <div><dt>Acuto (ATL)</dt><dd class="gx-tile-score" data-source="load" data-field="atl">—</dd></div>
+          <div><dt>Forma (TSB)</dt><dd class="gx-tile-score" data-source="load" data-field="tsb">—</dd></div>
+          <div><dt>Rapporto acuto:cronico</dt><dd class="gx-tile-score" data-source="load" data-field="acwr">—</dd></div>
+        </dl>
+        <p class="gx-note gx-acwr-note">Rapporto acuto:cronico tra 0,8 e 1,3: zona in cui il rischio di sovraccarico è più basso.</p>
+      </div>
+      <div class="gx-card" id="trend-recupero">
+        <h2>Recupero, ultimi 60 giorni</h2>
+        <p class="gx-note">Punti: valore del giorno · linea: media 7 giorni</p>
+        <div class="gx-chart" id="chart-rec60" data-source="wellness"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OBIETTIVO -->
+  <section class="gx-page" id="obiettivo" role="tabpanel" aria-labelledby="tab-obiettivo" hidden>
+    <div class="nx" id="goal-root">
+      <div class="nx-top" id="goal-head">
+        <div class="nx-title">
+          <span class="nx-eyebrow">Obiettivo attivo</span>
+          <h2 class="gl-name">—</h2>
+          <p class="nx-note gl-meta">—</p>
+        </div>
+        <div class="gl-countdown"><b class="gl-days">—</b><span>giorni alla gara</span></div>
+      </div>
+      <div class="ck-wrap" id="carica-obiettivo" data-source="goal_plan goals"></div>
+
+      <div id="goal-estimate" class="gl-hero">
+        <div class="nx-card gl-time-card">
+          <h3 id="gl-stima">Tempo stimato</h3>
+          <b class="gl-time">—</b>
+          <span class="gl-range">—</span>
+          <span class="nx-note gl-pace">—</span>
+          <span class="nx-note gl-delta"></span>
+        </div>
+        <div class="nx-card gl-conf-card">
+          <div class="gl-conf-top">
+            <div class="nx-ring gl-conf-ring"><div class="nx-ring-val"><b>—</b><span>/100</span></div></div>
+            <div>
+              <div class="gl-conf-label">Affidabilità —</div>
+              <p class="nx-note">Fattori che la abbassano (punti persi):</p>
+            </div>
+          </div>
+          <ul class="gl-factors"></ul>
+        </div>
+      </div>
+
+      <div>
+        <h3>Stima per metodo</h3>
+        <p class="nx-note">Ogni metodo dà la sua stima; la centrale è la media pesata per affidabilità (un metodo lontano più del 5% dagli altri pesa la metà). Etichette: <span class="gl-ev" style="color:#b4ff39">CONSOLIDATO</span> meta-analisi o consenso · <span class="gl-ev" style="color:#22e5ff">EMERGENTE</span> pochi studi promettenti · <span class="gl-ev" style="color:#ffb22e">PRELIMINARE MA RILEVANTE</span> evidenze minime.</p>
+      </div>
+      <div class="nx-grid gl-methods" data-source="race_methods"></div>
+
+      <div class="nx-card" id="gl-est-card">
+        <div class="nx-card-head"><h3>La stima giorno per giorno</h3><span class="nx-note">ricalcolata con le corse fino a ogni data · in alto = più veloce</span></div>
+        <div class="nx-chart" id="gl-est-chart" data-source="race_estimate"></div>
+        <div class="nx-zone-legend gl-est-legend"></div>
+      </div>
+
+      <div>
+        <h3 id="gl-piano">Piano fino alla gara</h3>
+        <p class="nx-note">Tocca un giorno per obiettivo fisiologico, struttura e note. I giorni passati restano come erano stati proposti; i prossimi si ricalcolano dopo ogni allenamento (↻ = adattato).</p>
+      </div>
+      <div class="gl-plan" data-source="goal_plan goal_weeks"></div>
+
+      <div class="nx-card" id="gl-zone-card">
+        <div class="nx-card-head"><h3>Zone per questo obiettivo</h3><span class="nx-note">passo dal VDOT equivalente alla stima · FC dalle tue zone Garmin</span></div>
+        <div class="gl-tablebox">
+          <table class="gx-table gl-zones" data-source="goal_zones" data-row-key="key">
+            <thead><tr><th data-field="name">Zona</th><th class="num" data-field="pace_fmt">Passo /km</th><th class="num" data-field="hr_fmt">FC bpm</th><th data-field="use">Uso</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <h3 id="gl-voti">Voto agli allenamenti svolti</h3>
+        <p class="nx-note">Ogni corsa dal giorno dopo l'obiettivo precedente, abbinata al giorno del piano o (senza piano) al tipo dedotto, valutata 0–100 sui parametri ottimali del suo tipo.</p>
+      </div>
+      <div class="gl-grades-wrap">
+        <div class="nx-card">
+          <div class="gl-tablebox">
+            <table class="gx-table gl-grades" data-source="goal_grades" data-row-key="id">
+              <thead><tr><th data-field="date">Data</th><th data-field="name">Nome</th><th data-field="type">Tipo</th><th class="gx-hide-narrow" data-field="type_source">Rif.</th><th class="num gx-hide-narrow" data-field="km">Km</th><th class="num" data-field="pace_fmt">Passo</th><th class="num" data-field="score">Voto</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="nx-card" id="gl-grade-detail" hidden>
+          <div class="gl-conf-top">
+            <div class="nx-ring gl-grade-ring"><div class="nx-ring-val"><b>—</b><span>/100</span></div></div>
+            <div class="gl-grade-head">
+              <h2 class="gl-grade-title">—</h2>
+              <p class="nx-note gl-grade-meta">—</p>
+            </div>
+          </div>
+          <div class="nx-coach gl-grade-comment">—</div>
+          <div class="gl-parts" data-source="goal_grade_parts"></div>
+        </div>
+      </div>
+
+      <div>
+        <h3 id="gl-storico">Storico obiettivi</h3>
+        <p class="nx-note">Si modificano in data/goals.json o con "python main.py goal".</p>
+      </div>
+      <div class="gl-history" data-source="goals"></div>
+    </div>
+  </section>
+
+  <!-- RECUPERO -->
+  <section class="gx-page" id="recupero" role="tabpanel" aria-labelledby="tab-recupero" hidden>
+    <div class="nx" data-source="recovery_weekly wellness load">
+      <div class="nx-title">
+        <span class="nx-eyebrow">Recupero</span>
+        <h2>Come stai assorbendo il carico</h2>
+        <p class="nx-note">Voto settimanale 0–100 su 8 aree fisiologiche, ognuna confrontata con la tua baseline dei 60 giorni precedenti.</p>
+      </div>
+      <div class="nx-rec-hero"></div>
+      <div class="nx-card" id="nx-rec-weeks-card">
+        <div class="nx-card-head"><h3>Voto di recupero per settimana</h3><span class="nx-note">tocca una barra per il dettaglio · barre chiare = settimana in corso</span></div>
+        <div class="nx-chart" id="nx-rec-weeks"></div>
+        <div class="nx-zone-legend"><span><i style="background:#b4ff39"></i>≥ 80 Ottimo</span><span><i style="background:#22e5ff"></i>65–79 Buono</span><span><i style="background:#ffb22e"></i>50–64 Da migliorare</span><span><i style="background:#ff4d7d"></i>&lt; 50 Critico</span></div>
+      </div>
+      <div>
+        <h3 class="nx-rec-detail-title">Settimana</h3>
+        <p class="nx-note">Le 8 aree del voto, con il dato che le ha determinate.</p>
+      </div>
+      <div class="nx-sections nx-rec-areas"></div>
+      <div class="nx-card-head">
+        <h3>Metriche giornaliere</h3>
+        <div class="nx-chips" role="group" aria-label="Periodo">
+          <button class="nx-chip" data-recrange="90">90 gg</button>
+          <button class="nx-chip" data-recrange="180">180 gg</button>
+          <button class="nx-chip" data-recrange="365">1 anno</button>
+        </div>
+      </div>
+      <div class="nx-rec-daily">
+        <h3>Sistema nervoso autonomo</h3>
+        <div class="nx-grid">
+          <div class="nx-card" id="nx-c-hrv"><div class="nx-card-head"><h3>HRV notturna</h3><span class="nx-note">ms · fascia verde: range normale della media 7 gg (baseline ± 0,5 SD)</span></div><div class="nx-chart" id="nx-r-hrv"></div></div>
+          <div class="nx-card" id="nx-c-cv"><div class="nx-card-head"><h3>Variabilità HRV (CV 7 gg)</h3><span class="nx-note">% · sopra 6% il sistema è perturbato</span></div><div class="nx-chart" id="nx-r-cv"></div></div>
+          <div class="nx-card" id="nx-c-rhr"><div class="nx-card-head"><h3>FC a riposo</h3><span class="nx-note">bpm · grigio: baseline 60 gg</span></div><div class="nx-chart" id="nx-r-rhr"></div></div>
+        </div>
+        <h3>Sonno</h3>
+        <div class="nx-grid">
+          <div class="nx-card" id="nx-c-sleep"><div class="nx-card-head"><h3>Durata vs fabbisogno</h3><span class="nx-note">ore · linea: fabbisogno Garmin</span></div><div class="nx-chart" id="nx-r-sleep"></div></div>
+          <div class="nx-card" id="nx-c-score"><div class="nx-card-head"><h3>Sleep Score</h3><span class="nx-note">notte e media 7 gg</span></div><div class="nx-chart" id="nx-r-score"></div></div>
+          <div class="nx-card" id="nx-c-stages"><div class="nx-card-head"><h3>Sonno profondo e REM</h3><span class="nx-note">% del sonno totale</span></div><div class="nx-chart" id="nx-r-stages"></div></div>
+          <div class="nx-card" id="nx-c-bed"><div class="nx-card-head"><h3>Orario di addormentamento</h3><span class="nx-note">punti allineati = ritmo regolare</span></div><div class="nx-chart" id="nx-r-bed"></div></div>
+        </div>
+        <h3>Segnali respiratori ed energia</h3>
+        <div class="nx-grid">
+          <div class="nx-card" id="nx-c-resp"><div class="nx-card-head"><h3>Respiro nel sonno</h3><span class="nx-note">respiri/min · un rialzo spesso anticipa una malattia</span></div><div class="nx-chart" id="nx-r-resp"></div></div>
+          <div class="nx-card" id="nx-c-spo2"><div class="nx-card-head"><h3>SpO2 nel sonno</h3><span class="nx-note">%</span></div><div class="nx-chart" id="nx-r-spo2"></div></div>
+          <div class="nx-card" id="nx-c-bb"><div class="nx-card-head"><h3>Body Battery ricaricata</h3><span class="nx-note">punti recuperati nella notte</span></div><div class="nx-chart" id="nx-r-bb"></div></div>
+          <div class="nx-card" id="nx-c-stress"><div class="nx-card-head"><h3>Stress</h3><span class="nx-note">punti: media diurna · linea: nel sonno</span></div><div class="nx-chart" id="nx-r-stress"></div></div>
+        </div>
+        <h3>Carico</h3>
+        <div class="nx-grid">
+          <div class="nx-card" id="nx-c-load"><div class="nx-card-head"><h3>Carico acuto vs cronico</h3><span class="nx-note">TSS · barre: giorno</span></div><div class="nx-chart" id="nx-r-load"></div></div>
+          <div class="nx-card" id="nx-c-acwr"><div class="nx-card-head"><h3>Rapporto acuto:cronico</h3><span class="nx-note">0,8–1,3 zona sicura</span></div><div class="nx-chart" id="nx-r-acwr"></div></div>
+          <div class="nx-card" id="nx-c-tsb"><div class="nx-card-head"><h3>Forma (TSB)</h3><span class="nx-note">sotto zero: fatica accumulata</span></div><div class="nx-chart" id="nx-r-tsb"></div></div>
+          <div class="nx-card" id="nx-c-index"><div class="nx-card-head"><h3>Indice di recupero giornaliero</h3><span class="nx-note">0–100 · linea: media 7 gg</span></div><div class="nx-chart" id="nx-r-index"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ALLENAMENTI -->
+  <section class="gx-page" id="allenamenti" role="tabpanel" aria-labelledby="tab-allenamenti" hidden>
+    <div class="gx-card" id="elenco-allenamenti">
+      <h2>Allenamenti valutati</h2>
+      <p class="gx-note">Voto 1–100 su aderenza alle zone, efficienza aerobica, stabilità e tecnica. Tocca una riga per il dettaglio.</p>
+      <div class="gx-chips" role="group" aria-label="Sport">
+        <button class="gx-chip" data-sport="all">Tutti</button>
+        <button class="gx-chip" data-sport="run">Corsa</button>
+        <button class="gx-chip" data-sport="bike">Bici</button>
+        <button class="gx-chip" data-sport="swim">Nuoto</button>
+        <button class="gx-chip" data-sport="other">Altro</button>
+        <input class="gx-search" id="cerca-allenamenti" type="search" placeholder="Cerca per nome" aria-label="Cerca allenamento">
+      </div>
+      <div class="gx-tablebox">
+        <table class="gx-table gx-acts" data-source="activities" data-row-key="id">
+          <thead><tr>
+            <th data-field="date"><button data-sort="date">Data</button></th>
+            <th data-field="sport_label"><button data-sort="sport_label">Sport</button></th>
+            <th data-field="name"><button data-sort="name">Nome</button></th>
+            <th class="num" data-field="duration_min"><button data-sort="duration_min">Min</button></th>
+            <th class="num gx-hide-narrow" data-field="distance_km"><button data-sort="distance_km">Km</button></th>
+            <th class="num" data-field="score"><button data-sort="score">Voto</button></th>
+            <th class="num gx-hide-narrow" data-field="tss"><button data-sort="tss">TSS</button></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="gx-card" id="dettaglio-allenamento">
+      <h2 class="gx-det-title" data-source="activities" data-field="name">—</h2>
+      <p class="gx-note"><span class="gx-det-sport" data-source="activities" data-field="sport_label">—</span> · <span class="gx-det-date" data-source="activities" data-field="start">—</span> · <span class="gx-det-dur" data-source="activities" data-field="duration_min">—</span> min</p>
+      <div class="gx-hero">
+        <div class="nx-ring nx-gen-ring"><div class="nx-ring-val"><b class="gx-det-score" data-source="activities" data-field="score">—</b><span class="nx-gen-tier"></span></div></div>
+        <div class="gx-note">Affidabilità del voto <span class="gx-det-conf" data-source="activities" data-field="confidence">—</span><br>TSS <span class="gx-det-tss" data-source="activities" data-field="tss">—</span> · <span class="gx-det-tssm" data-source="activities" data-field="tss_method">—</span></div>
+      </div>
+      <dl class="gx-dl gx-det-metrics"></dl>
+      <div><h3 class="nx-h3">Voto per componente</h3><p class="gx-note">Ogni voce da 0 a 100; il voto è la loro media pesata.</p></div>
+      <div class="nx-sections nx-gen-sections" data-source="components"></div>
+    </div>
+
+    <section class="nx" id="report-corsa" hidden data-source="runs components run_stream run_splits">
+      <div class="nx-top">
+        <div class="nx-ring"><div class="nx-ring-val"><b>—</b><span></span></div></div>
+        <div class="nx-title">
+          <span class="nx-eyebrow">Report corsa</span>
+          <h2 class="nx-run-name">—</h2>
+          <p class="nx-note nx-run-date">—</p>
+        </div>
+      </div>
+      <div class="nx-stats"></div>
+      <div class="nx-coach">—</div>
+      <div>
+        <h3>Voto per sezione</h3>
+        <p class="nx-note">Sette aree valutate da 0 a 100; il voto della corsa è la loro media pesata.</p>
+      </div>
+      <div class="nx-sections"></div>
+      <div class="nx-card" id="nx-pace-card">
+        <div class="nx-card-head"><h3>Passo</h3><span class="nx-note">min/km sulla distanza · in alto = più veloce</span></div>
+        <div class="nx-chart" id="nx-chart-pace"></div>
+      </div>
+      <div class="nx-card" id="nx-hr-card">
+        <div class="nx-card-head"><h3>Frequenza cardiaca</h3><span class="nx-note">bpm sulla distanza</span></div>
+        <div class="nx-chart" id="nx-chart-hr"></div>
+        <div class="nx-zones"></div>
+        <div class="nx-zone-legend"></div>
+      </div>
+      <div class="nx-card" id="nx-alt-card" hidden>
+        <div class="nx-card-head"><h3>Altimetria</h3><span class="nx-note">metri</span></div>
+        <div class="nx-chart" id="nx-chart-alt"></div>
+      </div>
+      <div>
+        <h3>Dinamiche di corsa</h3>
+        <p class="nx-note">Media della corsa e variazione nell'ultimo terzo rispetto al primo: segnala quando la tecnica cede alla fatica.</p>
+      </div>
+      <div class="nx-grid nx-dyn"></div>
+      <div class="nx-card" id="nx-splits-card">
+        <div class="nx-card-head"><h3>Split per km</h3><span class="nx-note">barra più alta = km più veloce · colore dal ciano (FC bassa) al magenta (FC alta)</span></div>
+        <div class="nx-chart" id="nx-chart-splits"></div>
+      </div>
+    </section>
+  </section>
+
+  <!-- PROGRESSI -->
+  <section class="gx-page" id="progressi" role="tabpanel" aria-labelledby="tab-progressi" hidden>
+    <div class="gx-card" id="ftp-chart">
+      <h2>FTP e potenza in bici</h2>
+      <p class="gx-note">Linea: FTP stimata = 95% del miglior 20 minuti degli ultimi 90 giorni · gradini: FTP impostata su Garmin · punti: miglior 20' di ogni uscita (W)</p>
+      <div class="gx-chart" id="chart-ftp" data-source="activities ftp_est"></div>
+    </div>
+    <section class="nx" id="progressi-corsa" data-source="runs run_hr_pace run_pace_dyn run_hr_trend run_hr_summary run_dyn_trend run_trend run_weekly">
+      <div class="nx-title">
+        <span class="nx-eyebrow">Progressi corsa</span>
+        <h2>Il motore e il gesto nel tempo</h2>
+      </div>
+      <div class="nx-chips" role="group" aria-label="Ambiente">
+        <button class="nx-chip" data-runenv="out">Outdoor</button>
+        <button class="nx-chip" data-runenv="in">Tapis roulant</button>
+      </div>
+      <div class="nx-card" id="nx-hr-pace">
+        <div class="nx-card-head"><h3>Passo a parità di frequenza cardiaca</h3><span class="nx-note">corse continue in piano, dopo il riscaldamento, ≥ 3 min nella fascia</span></div>
+        <div class="nx-chips nx-hr-chips" role="group" aria-label="Fascia FC"></div>
+        <p class="nx-big-take nx-hr-take">—</p>
+        <div class="nx-chart nx-p-hr" id="nx-p-hr"></div>
+      </div>
+      <div class="nx-card" id="nx-pace-dyn">
+        <div class="nx-card-head"><h3>Dinamiche a parità di passo</h3><span class="nx-note">stesso ritmo, gesto più economico?</span></div>
+        <div class="nx-chips nx-pace-chips" role="group" aria-label="Fascia di passo"></div>
+        <div class="nx-grid nx-pdyn"></div>
+      </div>
+      <div class="nx-grid">
+        <div class="nx-card" id="nx-ef"><div class="nx-card-head"><h3>Efficiency Factor</h3><span class="nx-note">m/min per battito</span></div><div class="nx-chart" id="nx-p-ef"></div></div>
+        <div class="nx-card" id="nx-dec"><div class="nx-card-head"><h3>Deriva cardiaca</h3><span class="nx-note">% · sotto 5% = base solida</span></div><div class="nx-chart" id="nx-p-dec"></div></div>
+        <div class="nx-card" id="nx-vo2"><div class="nx-card-head"><h3>VO2max stimato</h3><span class="nx-note">Garmin, ml/kg/min</span></div><div class="nx-chart" id="nx-p-vo2"></div></div>
+        <div class="nx-card" id="nx-vol"><div class="nx-card-head"><h3>Volume settimanale</h3><span class="nx-note">km, outdoor + tapis roulant</span></div><div class="nx-chart" id="nx-p-vol"></div></div>
+      </div>
+      <div>
+        <h3>Voti per sezione nel tempo</h3>
+        <p class="nx-note">Punti: singole corse · linea: media 28 giorni · valore: media attuale.</p>
+      </div>
+      <div class="nx-grid nx-psec"></div>
+    </section>
+  </section>
+</div>
+  </div>
+  <footer id="app-foot"></footer>
+</div>
+<script src="d3.min.js"></script>
+<script src="app.js"></script>
+<script src="inline-1.js"></script>
+<script src="inline-2.js"></script>
+<script src="inline-3.js"></script>
+<script src="inline-4.js"></script>
+<script src="icons.js"></script>
+<script src="run.js"></script>
+<script src="recovery.js"></script>
+<script src="pages.js"></script>
+<script src="goal.js"></script>
+<script src="today.js"></script>
+<script src="carica.js"></script>
+</body>
+</html>

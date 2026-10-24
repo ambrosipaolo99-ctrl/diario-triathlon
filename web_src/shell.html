@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#070a12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Diario">
+<title>Diario Triathlon</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="stylesheet" href="base.css">
+{{STYLES}}
+</head>
+<body>
+<div id="lock">
+  <form id="lock-form" class="lock-card" autocomplete="on">
+    <svg class="lock-logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h4l2.5-5 4 10 2.5-5H22"/></svg>
+    <h1>Diario Triathlon</h1>
+    <p class="lock-text">Inserisci la frase segreta per sbloccare i tuoi dati su questo dispositivo.</p>
+    <input class="sr-only" type="text" name="username" autocomplete="username" value="diario-triathlon" tabindex="-1" aria-hidden="true">
+    <label class="sr-only" for="lock-pass">Frase segreta</label>
+    <input id="lock-pass" name="password" type="password" autocomplete="current-password" required minlength="20" placeholder="Frase segreta" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button id="lock-go" type="submit">Sblocca</button>
+    <p id="lock-msg" role="status">Caricamento…</p>
+    <p class="lock-note">La frase non viene mai inviata: i dati si decifrano solo su questo dispositivo.</p>
+  </form>
+</div>
+<div id="app" hidden>
+  <div id="dash-root">
+{{BODY}}
+  </div>
+  <footer id="app-foot"></footer>
+</div>
+{{SCRIPTS}}
+</body>
+</html>
