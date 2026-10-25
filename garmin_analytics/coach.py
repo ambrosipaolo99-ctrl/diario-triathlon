@@ -189,9 +189,10 @@ def apply_taper(plan: dict[str, dict], tp: dict, today: date, frozen: set[str], 
     for b in tp["blocks"]:
         keys = [(race_day - timedelta(days=d)).isoformat() for d in b["days"]]
         keys = [k for k in keys if k in plan]
-        movable = [k for k in keys if k >= today.isoformat() and k not in frozen and plan[k]["type"] in ("facile", "lungo")
+        movable = [k for k in keys if k >= today.isoformat() and k not in frozen and not plan[k].get("status")
+                   and plan[k]["type"] in ("facile", "lungo")
                    and plan[k]["d"] > 1 and plan[k].get("km")]
-        fixed = sum(plan[k].get("km") or 0 for k in keys if k not in movable and plan[k]["type"] != "riposo")
+        fixed = sum(block_km(plan[k]) for k in keys if k not in movable)
         free = sum(plan[k]["km"] for k in movable)
         if free > 0:
             f = float(np.clip((b["target_km"] - fixed) / free, 0.6, 1.3))
@@ -202,7 +203,16 @@ def apply_taper(plan: dict[str, dict], tp: dict, today: date, frozen: set[str], 
                     w["minutes"] = round(w["minutes"] * new / w["km"])
                 w["title"] = retitle(w["title"], w["km"], new)
                 w["km"] = new
-        b["planned_km"] = round(sum(plan[k].get("km") or 0 for k in keys if plan[k]["type"] != "riposo"), 1)
+        b["planned_km"] = round(sum(block_km(plan[k]) for k in keys), 1)
+
+
+def block_km(w: dict) -> float:
+    """Km di un giorno nel conto dei blocchi: quelli corsi se il giorno e' gia' svolto (anche su un riposo), se no i previsti."""
+    if w.get("done_km") is not None:
+        return w["done_km"]
+    if w.get("status") in ("saltato", "riposo") or w["type"] == "riposo":
+        return 0.0
+    return w.get("km") or 0.0
 
 
 def taper_day(day: date, d: int, Z: dict, prof: RunProfile, s: float, weight: float) -> dict:
@@ -720,10 +730,6 @@ def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run
                            and not x.startswith("done_")}
         day += timedelta(days=1)
 
-    # 1b) scarico esponenziale: volume dei giorni ancora da fare riportato sulla curva (gli adattati restano)
-    taper = taper_params(prof, v0, race_day)
-    apply_taper(plan, taper, today, set(store["pinned"]), race_day)
-
     # 2) abbinamento delle corse e voti
     Zt = zones(ath, prof, est_for(today + timedelta(days=1))["central_s"])
     by_day: dict[str, list[Run]] = {}
@@ -755,7 +761,9 @@ def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run
                     c = r.day + timedelta(days=off)
                     ck = c.isoformat()
                     pw = plan.get(ck)
-                    if (pw and wk0 <= c <= wk1 and pw["type"] not in ("riposo", "gara") and ck not in used_plan
+                    # un lungo anticipato vale anche a cavallo della settimana (es. rimandato al lunedi' e fatto la domenica)
+                    same_week = wk0 <= c <= wk1 or (off > 0 and pw is not None and pw["type"] == "lungo")
+                    if (pw and same_week and pw["type"] not in ("riposo", "gara") and ck not in used_plan
                             and fits(pw) and not (c < r.day and ck in by_day)):
                         cands.append(ck)
                 if cands:
@@ -779,6 +787,20 @@ def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run
             prefix = ""
             if w and not spec:
                 prefix = f"Previsto {w['type']} ({w['title']}), svolto {kind}: valutato con i criteri del {kind}. "
+            if (w and k_plan and k_plan > k and k in plan and plan[k]["type"] in ("riposo", "facile")
+                    and not plan[k].get("activity_id")):
+                # allenamento anticipato (spesso uno appena rimandato e fatto lo stesso): i due giorni si scambiano,
+                # cosi' il giorno dopo torna leggero e il volume resta nella settimana in cui e' stato corso
+                a = {x: v for x, v in plan[k].items() if x not in ("changed_from", "changed_on", "adapted")}
+                plan[k] = {**{x: v for x, v in w.items() if x not in ("changed_from", "changed_on", "adapted")},
+                           "date": k, "d": a["d"], "phase": a["phase"]}
+                plan[k_plan] = {**a, "date": k_plan, "d": w["d"], "phase": w["phase"], "status": None,
+                                "generated_on": today.isoformat(),
+                                "adapted": f"{w['title'].lower()} anticipato al {r.day:%d/%m}: qui torna "
+                                           + ("il riposo" if a["type"] == "riposo" else "il facile")}
+                touched.add(k_plan)
+                w, k_plan = plan[k], k
+                kind, spec = w["type"], w
             if w and k_plan:
                 used_plan.add(k_plan)
                 kd = date.fromisoformat(k_plan)
@@ -804,6 +826,11 @@ def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run
                 parts.append({"key": f"{r.id}-{j}", "activity_id": r.id, "component": c["name"], "weight": c["weight"],
                               "eff_weight": c.get("eff_weight", 0), "score": None if c["score"] is None else round(c["score"]),
                               "value": c["value"], "note": c["note"]})
+
+    # 2b) scarico esponenziale: volume dei giorni ancora da fare riportato sulla curva (adattati e svolti restano);
+    # dopo l'abbinamento, cosi' un allenamento anticipato o scambiato conta nel blocco giusto
+    taper = taper_params(prof, v0, race_day)
+    apply_taper(plan, taper, today, set(store["pinned"]) | touched, race_day)
 
     # 3) stato dei giorni e adattamenti
     rec = conn.execute("SELECT date, recovery_index, recovery_json FROM wellness_daily WHERE recovery_index IS NOT NULL "
@@ -920,10 +947,13 @@ def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run
             w["minutes"] = round(km * (w["pace_lo"] + w["pace_hi"]) / 2 / 60)
 
     def postpone(k: str, why: str) -> bool:
-        """Rimanda di un giorno un allenamento duro, scambiandolo con il giorno dopo se e' facile o riposo."""
+        """
+        Rimanda di un giorno un allenamento duro, scambiandolo con il giorno dopo se e' facile o riposo. Mai oltre la
+        domenica: il lungo della domenica non finisce nella settimana (e nel blocco di scarico) successiva.
+        """
         d0 = date.fromisoformat(k)
         nk = (d0 + timedelta(days=1)).isoformat()
-        if not (nk in plan and free(nk) and plan[nk]["type"] in ("facile", "riposo") and plan[nk]["d"] >= 2
+        if not (nk in plan and free(nk) and _monday(d0) == _monday(d0 + timedelta(days=1)) and plan[nk]["type"] in ("facile", "riposo") and plan[nk]["d"] >= 2
                 and kind_on(d0 + timedelta(days=2)) not in hard):
             return False
         plan[k], plan[nk] = ({**plan[nk], "date": k, "d": plan[k]["d"], "status": plan[k]["status"]},
@@ -1106,7 +1136,7 @@ def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run
     taper_rows = []
     for b in taper["blocks"]:
         keys = [(race_day - timedelta(days=d)).isoformat() for d in b["days"]]
-        planned = sum(plan[k].get("km") or 0 for k in keys if k in plan and plan[k]["type"] != "riposo")
+        planned = sum(block_km(plan[k]) for k in keys if k in plan)
         taper_rows.append({"block": b["block"], "start": b["from"], "end": b["to"], "target_km": b["target_km"],
                            "planned_km": round(planned, 1), "reduction_pct": b["reduction_pct"],
                            "pre_taper_week_km": round(taper["v0"], 1), "final_cut_pct": round(100 * taper["final_cut"]),
