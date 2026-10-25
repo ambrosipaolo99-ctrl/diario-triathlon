@@ -131,6 +131,8 @@
     setTimeout(() => $('lock-pass').focus(), 50);
   }
 
+  let currentMeta = null;
+
   function install(bundle) {
     for (const k of Object.keys(sources)) delete sources[k];
     for (const [k, v] of Object.entries(bundle)) if (!k.startsWith('_')) sources[k] = v;
@@ -138,9 +140,136 @@
     state = 'ok';
     $('lock').hidden = true;
     $('app').hidden = false;
-    footer(bundle._meta && bundle._meta[0], bundle._sync_log || []);
+    currentMeta = bundle._meta && bundle._meta[0];
+    $('app-updated').textContent = currentMeta ? 'Aggiornato ' + fmtTime(currentMeta.generated_at) : '';
+    footer(currentMeta, bundle._sync_log || []);
     lastW = $('dash-root').clientWidth;
     emit();
+  }
+
+  // ------------------------------------------------------------ "Aggiorna": avvia la sincronizzazione su GitHub
+  // La chiave GitHub (fine-grained, solo questo repository, solo "Actions: read and write") sta SOLO su questo
+  // dispositivo: puo' avviare il workflow, non leggere ne' cambiare codice o segreti.
+  const GH_API = 'https://api.github.com';
+  const TOKEN_KEY = 'gh-actions-token';
+  const REPO = (() => {
+    const owner = location.hostname.endsWith('.github.io') ? location.hostname.split('.')[0] : null;
+    const repo = location.pathname.split('/').filter(Boolean)[0];
+    return owner && repo ? `${owner}/${repo}` : null;
+  })();
+  const gh = (path, token, opts = {}) => fetch(GH_API + path, {
+    ...opts, cache: 'no-store', referrerPolicy: 'no-referrer',
+    headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28',
+      ...(opts.body ? { 'Content-Type': 'application/json' } : {}) },
+  });
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let syncing = false;
+
+  function syncStatus(text, kind) {
+    const s = $('app-sync-status');
+    s.textContent = text || '';
+    s.className = 'app-sync-status' + (kind ? ' app-sync-' + kind : '');
+  }
+
+  function tokenSheet(onSaved) {
+    const owner = REPO.split('/')[0];
+    const sheet = el('div', 'app-sheet');
+    const card = el('form', 'lock-card app-sheet-card');
+    const link = el('a', 'app-link', 'Crea la chiave su GitHub ↗');
+    link.href = 'https://github.com/settings/personal-access-tokens/new?name=Diario%20-%20Aggiorna&description=Avvia%20la%20sincronizzazione%20dalla%20web%20app'
+      + `&target_name=${encodeURIComponent(owner)}&expires_in=365&actions=write`;
+    link.target = '_blank'; link.rel = 'noopener noreferrer';
+    const steps = el('ol', 'app-steps');
+    ['Tocca il link qui sotto e accedi a GitHub.',
+      'Repository access: "Only select repositories" → ' + REPO.split('/')[1] + '.',
+      'Permissions → Repository permissions → Actions: "Read and write". Nient\'altro.',
+      'Generate token, copia la chiave e incollala qui.'].forEach((t) => steps.append(el('li', null, t)));
+    const input = el('input'); input.type = 'password'; input.placeholder = 'github_pat_…'; input.autocomplete = 'off';
+    input.id = 'gh-token-input'; input.spellcheck = false;
+    const msg = el('p', 'lock-text');
+    const save = el('button', 'app-primary', 'Salva sul telefono'); save.type = 'submit';
+    const cancel = el('button', 'app-btn', 'Annulla'); cancel.type = 'button';
+    card.append(el('h1', null, 'Aggiorna da Garmin'),
+      el('p', 'lock-text', "Per avviare la sincronizzazione dall'app serve una chiave GitHub con un solo permesso. Resta solo su questo telefono."),
+      steps, link, input, save, msg, cancel);
+    sheet.append(card);
+    document.body.append(sheet);
+    cancel.addEventListener('click', () => sheet.remove());
+    card.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const token = input.value.trim();
+      if (!/^(github_pat_|ghp_)[A-Za-z0-9_]{20,}$/.test(token)) { msg.textContent = 'Non sembra una chiave GitHub.'; return; }
+      msg.textContent = 'Verifica…';
+      try {
+        const r = await gh(`/repos/${REPO}/actions/workflows/sync.yml`, token);
+        if (!r.ok) { msg.textContent = r.status === 404 || r.status === 403 ? 'La chiave non ha accesso alle Actions di questo repository.' : 'Chiave non valida o scaduta.'; return; }
+        await window.dtLocal.set(TOKEN_KEY, token);
+        input.value = '';
+        sheet.remove();
+        onSaved();
+      } catch (e) { msg.textContent = 'GitHub non raggiungibile: riprova.'; }
+    });
+  }
+
+  async function refreshData() {
+    const r = await fetch(DATA_URL + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const p = parse(await r.arrayBuffer());
+    const key = await getKey(hex(p.salt));
+    if (!key) throw new Error('chiave');
+    return open(p, key);
+  }
+
+  async function syncNow() {
+    if (syncing || !REPO) return;
+    const token = await window.dtLocal.get(TOKEN_KEY);
+    if (!token) { tokenSheet(syncNow); return; }
+    syncing = true;
+    const btn = $('app-sync'); btn.disabled = true; btn.classList.add('app-spin');
+    const before = currentMeta && currentMeta.generated_at;
+    try {
+      const t0 = Date.now();
+      const d = await gh(`/repos/${REPO}/actions/workflows/sync.yml/dispatches`, token, { method: 'POST', body: JSON.stringify({ ref: 'main' }) });
+      if (d.status === 401) { await window.dtLocal.set(TOKEN_KEY, null); syncStatus('Chiave scaduta o revocata: inseriscine una nuova.', 'bad'); return; }
+      if (d.status !== 204) { syncStatus('GitHub ha rifiutato la richiesta (' + d.status + ').', 'bad'); return; }
+      syncStatus('In coda su GitHub…');
+      let run = null;
+      while (Date.now() - t0 < 12 * 60e3) {
+        await sleep(8000);
+        const r = await gh(`/repos/${REPO}/actions/workflows/sync.yml/runs?event=workflow_dispatch&per_page=5`, token);
+        if (!r.ok) continue;
+        const runs = (await r.json()).workflow_runs || [];
+        run = runs.find((x) => Date.parse(x.created_at) >= t0 - 60e3) || run;
+        if (!run) continue;
+        if (run.status !== 'completed') {
+          const min = Math.max(0, Math.round((Date.now() - t0) / 60e3));
+          syncStatus(run.status === 'in_progress' ? `Sincronizzazione con Garmin in corso… (${min} min)` : 'In coda su GitHub…');
+          continue;
+        }
+        break;
+      }
+      if (!run || run.status !== 'completed') { syncStatus('Ci sta mettendo più del solito: riprova tra qualche minuto.', 'bad'); return; }
+      syncStatus('Scarico i dati nuovi…');
+      // GitHub Pages pubblica con qualche secondo di ritardo: si riprova finche' arriva il pacchetto nuovo
+      for (let i = 0; i < 8; i += 1) {
+        await sleep(i ? 10000 : 3000);
+        try {
+          const bundle = await refreshData();
+          const meta = bundle._meta && bundle._meta[0];
+          if (!before || (meta && meta.generated_at !== before)) {
+            install(bundle);
+            syncStatus(run.conclusion === 'success' ? 'Aggiornato ✓' : 'Aggiornato, con errori: vedi il registro in fondo.', run.conclusion === 'success' ? 'ok' : 'bad');
+            setTimeout(() => syncStatus(''), 6000);
+            return;
+          }
+        } catch (e) { /* si riprova */ }
+      }
+      syncStatus(run.conclusion === 'success' ? 'Sincronizzato: ricarica la pagina tra un minuto.' : 'Sincronizzazione fallita: vedi il registro in fondo.', 'bad');
+    } catch (e) {
+      syncStatus('Connessione assente: riprova.', 'bad');
+    } finally {
+      syncing = false; btn.disabled = false; btn.classList.remove('app-spin');
+    }
   }
 
   function footer(meta, log) {
@@ -165,6 +294,12 @@
     const det = el('details', 'app-log');
     det.append(el('summary', null, 'Registro sincronizzazione'), el('pre', null, log.join('\n')));
     tools.append(lock);
+    window.dtLocal.get(TOKEN_KEY).then((t) => {
+      if (!t) return;
+      const off = el('button', 'app-btn', 'Scollega GitHub');
+      off.addEventListener('click', async () => { await window.dtLocal.set(TOKEN_KEY, null); off.remove(); syncStatus('Chiave GitHub rimossa dal telefono.'); });
+      tools.append(off);
+    });
     f.append(tools, det);
   }
 
@@ -214,6 +349,8 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     $('lock-form').addEventListener('submit', unlock);
+    if (REPO) $('app-sync').addEventListener('click', syncNow);
+    else $('app-sync').hidden = true;          // fuori da GitHub Pages (test locale) non c'e' nulla da avviare
     start();
   });
 

@@ -14,6 +14,7 @@ Il repository è pubblico (GitHub Pages gratuito lo richiede), quindi **nulla qu
 | Database, obiettivi, token Garmin | release `state` | AES-256-GCM con chiave casuale (`STATE_KEY`) che esiste solo nei segreti di GitHub |
 | Password Garmin | segreto `GARMIN_PASSWORD` | usata solo al primo accesso, poi va cancellata |
 | Log delle esecuzioni | pubblici | solo "OK/ERRORE" per fase; i dettagli sono nel registro cifrato dentro l'app |
+| Chiave per il pulsante "Aggiorna" | solo sul telefono (IndexedDB) | fine-grained, solo questo repository, solo "Actions: read and write": avvia il workflow, non legge ne' modifica codice o segreti; revocabile da GitHub |
 
 - Il workflow parte solo all'orario fissato o a mano: mai da pull request.
 - Permessi minimi, azioni fissate al commit, librerie Python con versione e hash verificati.
