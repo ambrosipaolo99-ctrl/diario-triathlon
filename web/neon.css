@@ -216,6 +216,7 @@
 .td-meta .gl-type { grid-area: auto; }
 .td-src { display: block; font-size: .68rem; color: var(--nx-lime); text-transform: uppercase; letter-spacing: .06em; }
 .td-groups { align-items: start; }
+.td-wait { font-size: .85rem !important; color: var(--nx-amber); }
 .td-group h3 { margin: 0; }
 .td-group-score b { font-size: 1.25rem; }
 .td-card > .gx-chip { align-self: flex-start; }

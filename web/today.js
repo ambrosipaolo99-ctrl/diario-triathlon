@@ -72,6 +72,8 @@
       const b = el('b'); b.append(mk('span', null, '+' + f0(r.ascent_m) + ' m', 'ascent_m', w));
       const src = mk('span', 'td-src', r.ascent_source === 'strava' ? 'Strava' : 'orologio', 'ascent_source', w);
       stat('Dislivello', b); stats.lastChild.append(src);
+    } else if (r.ascent_source === 'in attesa di Strava') {
+      stat('Dislivello', mk('b', 'td-wait', 'in attesa di Strava', 'ascent_source', w));
     }
     if (r.tss != null) stat('TSS', mk('b', null, f0(r.tss), 'tss', w));
     c.append(stats);

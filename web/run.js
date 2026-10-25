@@ -306,7 +306,7 @@ dash.calc('run_weekly', {
 
     const stats = [
       ['Distanza', 'distance_km', (v) => f2(v) + ' km'], ['Tempo', 'moving_min', hm], ['Passo', 'pace_s', (v) => paceFmt(v) + '/km'],
-      ['Dislivello', 'ascent_m', (v) => `+${f0(v)} m${r.ascent_source === 'strava' ? ' (Strava)' : ''}`],
+      ['Dislivello', r.ascent_m != null ? 'ascent_m' : 'ascent_source', (v) => (typeof v === 'number' ? `+${f0(v)} m (Strava)` : v)],
       ['FC media', 'avg_hr', (v) => f0(v) + ' bpm'], ['FC max', 'max_hr', (v) => f0(v) + ' bpm'], ['Cadenza', 'cadence', (v) => f0(v) + ' ppm'],
       ['Contatto', 'gct', (v) => f0(v) + ' ms'], ['Efficiency Factor', 'ef', f2], ['VO2max Garmin', 'vo2max', f0],
     ];

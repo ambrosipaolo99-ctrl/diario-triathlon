@@ -288,8 +288,7 @@ def terrain(r: Run) -> str:
     """Nota sul percorso: in salita il passo non misura lo sforzo, conta la FC."""
     if not r.hilly or not r.ascent_m:
         return ""
-    src = "Strava" if r.ascent_source == "strava" else "orologio"
-    return (f"Percorso collinare: {r.ascent_m:.0f} m D+ ({r.ascent_m / max(r.km, 0.1):.0f} m/km, {src}); "
+    return (f"Percorso collinare: {r.ascent_m:.0f} m D+ ({r.ascent_m / max(r.km, 0.1):.0f} m/km, Strava); "
             "passo e regolarita' pesano meno, conta la FC. ")
 
 

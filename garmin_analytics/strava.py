@@ -2,7 +2,8 @@
 Dislivello da Strava.
 
 Il barometro dell'orologio puo' registrare dislivelli impossibili anche in piano (migliaia di metri
-su un lungo in pianura, dove Strava ne conta meno di 100): per le corse il riferimento e' Strava.
+su un lungo in pianura, dove Strava ne conta meno di 100): per le corse il dislivello e' SOLO quello di Strava,
+mai quello dell'orologio; finche' Strava non ha la corsa il dislivello resta sconosciuto.
 Le attivita' arrivano dal connettore Strava della sessione Claude come JSON (formato di
 `list_activities`) e si importano con `python main.py strava-import <file>`; le corse il cui
 dislivello cambia vengono rianalizzate dai FIT gia' scaricati, senza chiamate a Garmin.
@@ -73,26 +74,32 @@ def match(conn: sqlite3.Connection, start_local: Optional[str], distance_m: Opti
 
 
 def stale_runs(conn: sqlite3.Connection) -> list[int]:
-    """Corse analizzate con un dislivello diverso da quello Strava ora disponibile (per le frazioni, il multisport)."""
+    """
+    Corse da rianalizzare (per le frazioni, il multisport): dislivello diverso da quello Strava ora disponibile,
+    oppure un dislivello dell'orologio rimasto da un'analisi vecchia (va tolto: il D+ e' solo Strava).
+    """
     out = []
     q = ("SELECT activity_id, parent_id, start_local, distance_m, metrics_json FROM activities "
          "WHERE sport='run' AND is_parent=0 AND metrics_json IS NOT NULL")
     for r in conn.execute(q):
-        sv = match(conn, r["start_local"], r["distance_m"])
-        if not sv or sv["elevation_gain_m"] is None:
-            continue
         m = json.loads(r["metrics_json"]).get("metrics", {})
-        if m.get("treadmill"):
+        if m.get("treadmill") or "error" in m:
             continue
-        if m.get("ascent_source") != "strava" or m.get("ascent_m") != round(sv["elevation_gain_m"]):
+        sv = match(conn, r["start_local"], r["distance_m"])
+        if sv and sv["elevation_gain_m"] is not None:
+            stale = m.get("ascent_source") != "strava" or m.get("ascent_m") != round(sv["elevation_gain_m"])
+        else:
+            stale = m.get("ascent_source") != "in attesa di Strava"
+        if stale:
             out.append(r["parent_id"] or r["activity_id"])
     return sorted(set(out))
 
 
-def reanalyze(conn: sqlite3.Connection, ids: list[int]) -> int:
+def reanalyze(conn: sqlite3.Connection, ids: list[int], api=None) -> int:
     """
     Rianalisi dai FIT in cache, dalla corsa piu' vecchia: lo storico dei confronti resta coerente.
-    Solo i multisport chiedono a Garmin il dettaglio con le frazioni (login con i token salvati).
+    Solo i multisport chiedono a Garmin il dettaglio con le frazioni (login con i token salvati). Con `api`
+    (il cloud non ha la cache dei FIT) i file mancanti si riscaricano.
     """
     from .analysis import analyze_summary, mark_duplicates
     from .auth import get_client
@@ -100,7 +107,7 @@ def reanalyze(conn: sqlite3.Connection, ids: list[int]) -> int:
             "avg_hr", "avg_power", "norm_power", "garmin_load", "device_id", "is_parent")
     rows = conn.execute(f"SELECT * FROM activities WHERE activity_id IN ({','.join('?' * len(ids))}) "
                         "ORDER BY start_gmt", ids).fetchall() if ids else []
-    done, api = 0, None
+    done = 0
     for r in rows:
         try:
             if r["sport"] == "multi" and api is None:

@@ -122,6 +122,9 @@ def _main(a: argparse.Namespace, run: Run, log: io.StringIO) -> None:
             if redo:
                 # su richiesta (avvio manuale): rianalisi con nuovo download dei FIT, es. dopo un cambio dell'analisi
                 run.step(f"rianalisi {redo} giorni", sync_activities, api, days=redo, conn=conn, reanalyze=True)
+        # dislivello delle corse: SOLO Strava (API ufficiale); senza Strava resta "in attesa"
+        if os.environ.get("STRAVA_CLIENT_ID") and os.environ.get("STRAVA_CLIENT_SECRET"):
+            run.step("dislivello da Strava", strava_elevation, conn, api, run)
             with contextlib.suppress(Exception):
                 api.client.dump(str(Path(os.environ["GARMIN_TOKEN_DIR"])))   # token rinnovati nello stato
 
@@ -135,6 +138,28 @@ def _main(a: argparse.Namespace, run: Run, log: io.StringIO) -> None:
         blob = run.step("salvataggio stato", state.pack, root, key)
         if blob:
             a.state_out.write_bytes(blob)
+
+
+def strava_elevation(conn, api, run: Run) -> int:
+    """Rinnova l'accesso a Strava, importa le attivita' degli ultimi 30 giorni e rianalizza le corse interessate."""
+    from garmin_analytics import strava, strava_api
+    cid, secret = os.environ["STRAVA_CLIENT_ID"].strip(), os.environ["STRAVA_CLIENT_SECRET"].strip()
+    path = Path(os.environ["GARMIN_TOKEN_DIR"]) / "strava_tokens.json"
+    saved = strava_api.load_tokens(path)
+    code = (os.environ.get("STRAVA_AUTH_CODE") or "").strip()
+    if saved:
+        tok = strava_api.refresh(cid, secret, saved["refresh_token"])
+    elif code:
+        tok = strava_api.exchange_code(cid, secret, code)
+        run.note("collegamento Strava", "fatto: ora cancella il segreto STRAVA_AUTH_CODE")
+    else:
+        raise strava_api.StravaError("Strava non collegato: serve il segreto STRAVA_AUTH_CODE")
+    strava_api.save_tokens(path, tok)             # Strava puo' cambiare il refresh token: si tiene sempre l'ultimo
+    n = strava.import_activities(conn, strava_api.activities(tok["access_token"], days=30))
+    ids = strava.stale_runs(conn)
+    done = strava.reanalyze(conn, ids, api=api) if ids and api is not None else 0
+    logging.getLogger("cloud").info("Strava: %d attivita', %d/%d corse rianalizzate", n, done, len(ids))
+    return done
 
 
 def reanalyze_days() -> int:

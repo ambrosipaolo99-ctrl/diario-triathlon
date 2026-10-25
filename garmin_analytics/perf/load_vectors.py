@@ -11,7 +11,8 @@ Vettore B, strutturale (unita': migliaia di picchi di carico in pesi corporei, k
     tf = tempo di volo (60/cadenza - tc) (Morin 2005, validato su pedana) [CONSOLIDATO]; senza dinamiche
     una stima dalla velocita' [PRELIMINARE MA RILEVANTE]
   - discesa: +3,4% di forza d'impatto per ogni 1% di pendenza negativa (Gottschall & Kram 2005: +54% a -9 gradi)
-    [EMERGENTE]; con la quota dell'orologio inaffidabile si stima dal dislivello Strava (percorso ad anello)
+    [EMERGENTE]; la discesa totale e' SEMPRE il dislivello Strava (percorso ad anello), mai la quota dell'orologio:
+    del profilo dell'orologio si usa solo la forma, quando il suo totale torna con Strava
   - asimmetria: il lato che sta piu' a terra porta la quota maggiore (fattore = quota del lato / 50)
   L'indice nel suo insieme e' una costruzione di questo progetto [PRELIMINARE MA RILEVANTE]: va letto come
   confronto con il proprio storico, non come valore assoluto.
@@ -74,15 +75,22 @@ def _f_peak(p: dict) -> tuple[Optional[float], str]:
 
 
 def mechanical(r: RunDetail) -> dict:
+    """La discesa totale e' SEMPRE quella Strava (percorso ad anello: si scende quanto si sale); del profilo
+    dell'orologio si usa solo la forma, se attendibile, per sapere in quali tratti si scende."""
     pts = r.stream
-    loads, forces, steps_tot, methods = 0.0, [], 0.0, set()
-    descent, down_weighted, dist_tot = 0.0, 0.0, 0.0
-    use_alt = r.altitude_reliable and not r.treadmill and sum(1 for p in pts if p.get("alt") is not None) > len(pts) * 0.8
+    strava_desc = float(r.ascent_m) if (r.ascent_source == "strava" and r.ascent_m is not None and not r.treadmill) else None
+    use_shape = (strava_desc is not None and strava_desc > 0 and r.altitude_reliable
+                 and sum(1 for p in pts if p.get("alt") is not None) > len(pts) * 0.8)
     alt_s = None
-    if use_alt:
+    if use_shape:
         alts = [p.get("alt") for p in pts]
         # media mobile su 3 punti (90 s): toglie il rumore del barometro senza appiattire le salite
         alt_s = [np.nanmean([a for a in alts[max(0, i - 1):i + 2] if a is not None] or [np.nan]) for i in range(len(alts))]
+        raw = sum(max(0.0, alt_s[i - 1] - alt_s[i]) for i in range(1, len(alt_s))
+                  if not (np.isnan(alt_s[i]) or np.isnan(alt_s[i - 1])))
+        k = strava_desc / raw if raw > 0 else 0.0           # forma dell'orologio, totale di Strava
+    loads, forces, steps_tot, methods = 0.0, [], 0.0, set()
+    down_weighted, dist_tot = 0.0, 0.0
     prev_d = 0.0
     for i, p in enumerate(pts):
         d = p.get("dist_km")
@@ -97,12 +105,9 @@ def mechanical(r: RunDetail) -> dict:
         steps = (p.get("cad") or 168) * STEP_S / 60
         down = 1.0
         if alt_s is not None and i > 0 and not np.isnan(alt_s[i]) and not np.isnan(alt_s[i - 1]):
-            dz = alt_s[i] - alt_s[i - 1]
-            if dz < 0:
-                descent += -dz
-                grade = -dz / dd
-                if grade > 0.02:
-                    down = 1 + DOWNHILL_PER_PCT * min(grade * 100, 20)
+            dz = (alt_s[i] - alt_s[i - 1]) * k
+            if dz < 0 and -dz / dd > 0.02:
+                down = 1 + DOWNHILL_PER_PCT * min(-dz / dd * 100, 20)
         loads += steps * f * down
         down_weighted += dd * down
         dist_tot += dd
@@ -110,22 +115,23 @@ def mechanical(r: RunDetail) -> dict:
         steps_tot += steps
     if not forces:
         return {}
-    desc_method = "quota" if use_alt else None
-    if not use_alt and not r.treadmill and r.ascent_m:
-        # quota dell'orologio non affidabile: percorso ad anello, si scende quanto si sale (dislivello Strava)
-        descent = float(r.ascent_m)
-        desc_method = "stima da D+ " + ("Strava" if r.ascent_source == "strava" else "orologio")
-        half = max(dist_tot / 2, 1)
-        grade = descent / half
-        avg_down = 1 + DOWNHILL_PER_PCT * min(grade * 100, 20) if grade > 0.02 else 1.0
-        loads *= (1 + avg_down) / 2              # meta' percorso in discesa
-        down_factor = (1 + avg_down) / 2
-    else:
+    descent = strava_desc
+    if strava_desc is None:
+        desc_method = None if r.treadmill else "in attesa di Strava"
+        down_factor = 1.0
+    elif use_shape:
+        desc_method = "Strava (profilo dell'orologio per i tratti)"
         down_factor = down_weighted / dist_tot if dist_tot else 1.0
+    else:
+        desc_method = "Strava (ripartita su meta' percorso)"
+        grade = strava_desc / max(dist_tot / 2, 1)
+        avg_down = 1 + DOWNHILL_PER_PCT * min(grade * 100, 20) if grade > 0.02 else 1.0
+        down_factor = (1 + avg_down) / 2
+        loads *= down_factor
     asym = max(r.gct_balance, 100 - r.gct_balance) / 50 if r.gct_balance else 1.0
     return {
         "mech_kbw": round(loads * asym / 1000, 2), "f_peak_bw": round(float(np.mean(forces)), 2),
-        "steps": int(steps_tot), "descent_m": round(descent) if desc_method else None, "descent_method": desc_method,
+        "steps": int(steps_tot), "descent_m": None if descent is None else round(descent), "descent_method": desc_method,
         "downhill_factor": round(down_factor, 3), "asym_factor": round(asym, 3),
         "mech_method": " + ".join(sorted(methods)),
     }

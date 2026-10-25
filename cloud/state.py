@@ -9,7 +9,7 @@ from .crypto import open_state, seal_state
 
 # solo questi file entrano ed escono dallo stato (percorsi relativi alla cartella di stato)
 FILES = ("data/garmin.db", "data/goals.json", "tokens/garmin_tokens.json", "tokens/.rate_limit_cooldown.json",
-         "data_salt.bin", "carica_img.json")
+         "tokens/strava_tokens.json", "data_salt.bin", "carica_img.json")
 
 
 def pack(root: Path, key: bytes) -> bytes:

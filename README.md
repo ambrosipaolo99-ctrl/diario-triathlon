@@ -28,5 +28,9 @@ L'accesso a Garmin Connect non è ufficiale (libreria `garminconnect`): Garmin p
 - `STATE_KEY`: generata da `python -m cloud.seed`, non va mai copiata altrove.
 - `DATA_PASSPHRASE`: frase segreta per aprire la dashboard, almeno 20 caratteri (meglio 5 o più parole).
 - `GARMIN_EMAIL`, `GARMIN_PASSWORD`: solo per il primo accesso.
+- `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`: app API Strava personale (strava.com/settings/api). Il dislivello
+  delle corse viene SOLO da Strava, mai dall'orologio.
+- `STRAVA_AUTH_CODE`: codice di autorizzazione (scope `activity:read_all`), solo per il primo collegamento; poi
+  il token di rinnovo sta nello stato cifrato e il segreto va cancellato.
 
 Proteggi l'account GitHub con la verifica in due passaggi.

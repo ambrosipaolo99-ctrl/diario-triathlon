@@ -245,10 +245,15 @@ def _stream(d: pd.DataFrame) -> list[dict]:
             for _, r in agg.iterrows()]
 
 
-def _splits(d: pd.DataFrame, altitude_ok: bool) -> list[dict]:
+def _splits(d: pd.DataFrame, altitude_ok: bool, ascent: Optional[float]) -> list[dict]:
+    """Split per km; il dislivello per km e' la forma del profilo dell'orologio riscalata sul totale Strava."""
     rows = []
     km = d["dist_km"].clip(lower=0).astype(float).apply(np.floor).astype(int)
     alt = d["alt"].rolling(15, min_periods=1).mean() if "alt" in d and altitude_ok else None
+    scale = 1.0
+    if alt is not None:
+        watch_gain = float(alt.diff().clip(lower=0).sum())
+        scale = (ascent / watch_gain) if ascent and watch_gain > 0 else 0.0
     for k, g in d.groupby(km):
         meters = (g["dist_km"].iloc[-1] - g["dist_km"].iloc[0]) * 1000
         if meters < 200:
@@ -259,7 +264,7 @@ def _splits(d: pd.DataFrame, altitude_ok: bool) -> list[dict]:
                 r[c] = rnd(g[c].mean(), 3 if c == "step" else 1)
         if alt is not None:
             diff = alt.loc[g.index].diff()
-            r["elev_gain_m"] = rnd(diff.clip(lower=0).sum(), 0)
+            r["elev_gain_m"] = rnd(diff.clip(lower=0).sum() * scale, 0)
         rows.append(r)
     return rows
 
@@ -313,18 +318,15 @@ def analyze_run(sess: FitSession, ctx: AthleteContext, history: list[dict]) -> S
     intervals = is_interval_session(sess, "avg_speed")
     skip = warmup_seconds(dur)
 
-    # dislivello di riferimento: Strava se disponibile (il barometro dell'orologio sbaglia anche in piano)
-    garmin_ascent = float(s.get("total_ascent") or 0)
+    # dislivello: SOLO Strava, mai l'orologio (il barometro sbaglia anche in piano). Senza Strava resta sconosciuto
+    # ("in attesa") e la corsa si rianalizza quando arriva. Dell'orologio si usa al massimo la FORMA del profilo
+    # (grafico, ripartizione per km), solo se il suo totale torna con Strava, sempre riscalata sul totale Strava.
     strava_ascent = s.get("strava_ascent_m")
-    ascent = garmin_ascent if strava_ascent is None else float(strava_ascent)
-    ascent_km = 0.0 if treadmill else ascent / max(dist / 1000, 0.1)
-    if strava_ascent is None:
-        altitude_ok = (not treadmill) and ascent_km < 80      # oltre: barometro inaffidabile
-        hilly = altitude_ok and ascent_km > 20
-    else:
-        # quota dell'orologio (grafico, dislivello per km) solo se il suo totale torna con Strava
-        altitude_ok = (not treadmill) and abs(garmin_ascent - ascent) <= max(25.0, 0.3 * ascent)
-        hilly = (not treadmill) and ascent_km > 20
+    ascent = None if treadmill or strava_ascent is None else float(strava_ascent)
+    ascent_km = 0.0 if treadmill else None if ascent is None else ascent / max(dist / 1000, 0.1)
+    watch_ascent = float(s.get("total_ascent") or 0)
+    altitude_ok = ascent is not None and abs(watch_ascent - ascent) <= max(25.0, 0.3 * ascent)
+    hilly = bool(ascent_km and ascent_km > 20)
 
     np_w = None
     power_ok = bool("power" in m and m["power"].gt(0).mean() > 0.8)
@@ -339,8 +341,8 @@ def analyze_run(sess: FitSession, ctx: AthleteContext, history: list[dict]) -> S
         "avg_speed_ms": rnd(m["speed"].mean(), 3), "avg_hr": rnd(hr.mean(), 0) if has_hr else None,
         "max_hr": rnd(hr.max(), 0) if has_hr else None,
         "ascent_m_per_km": rnd(ascent_km, 1), "altitude_reliable": altitude_ok, "hilly": hilly,
-        "ascent_m": None if treadmill else rnd(ascent, 0), "ascent_garmin_m": None if treadmill else rnd(garmin_ascent, 0),
-        "ascent_source": None if treadmill else "strava" if strava_ascent is not None else "garmin",
+        "ascent_m": rnd(ascent, 0),
+        "ascent_source": None if treadmill else "strava" if ascent is not None else "in attesa di Strava",
         "avg_power": rnd(m["power"].mean(), 0) if power_ok else None,
         "normalized_power": rnd(np_w, 0) if power_ok else None,
         "power_reliable": power_ok if "power" in m else None,
@@ -367,7 +369,7 @@ def analyze_run(sess: FitSession, ctx: AthleteContext, history: list[dict]) -> S
     d = _derived(m)
     extra = {
         "stream": _stream(d),
-        "splits": _splits(d, altitude_ok),
+        "splits": _splits(d, altitude_ok, ascent),
         "hr_bins": _hr_bins(d, skip) if (not intervals and not hilly) else [],
         "pace_bins": _pace_bins(d),
     }
