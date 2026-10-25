@@ -234,7 +234,8 @@ def _goal_rows(conn: sqlite3.Connection, impact: dict | None = None) -> dict[str
     today = date.today()
     goals = load_goals()
     out: dict[str, list[dict]] = {k: [] for k in ("goals", "race_estimate", "race_methods", "race_factors",
-                                                  "goal_zones", "goal_plan", "goal_grades", "goal_grade_parts")}
+                                                  "goal_zones", "goal_plan", "goal_grades", "goal_grade_parts",
+                                                  "taper_plan")}
     out["goals"] = [{**g, "result_fmt": fmt_time(g.get("result_s")) if g.get("result_s") else None}
                     for g in goal_rows(conn, goals, today)]
     goal = active_goal(goals, today)
@@ -272,6 +273,7 @@ def _goal_rows(conn: sqlite3.Connection, impact: dict | None = None) -> dict[str
                         for p in res["plan"]]
     out["goal_grades"] = [{**g, "pace_fmt": fmt_pace(g["pace_s"])} for g in res["grades"]]
     out["goal_grade_parts"] = res["grade_parts"]
+    out["taper_plan"] = res.get("taper_plan", [])
     return out
 
 

@@ -341,6 +341,9 @@
         ' · gara ', mk('b', null, fmtDay(parseDay(meta.race_date)), 'taper_meta', 'race_date'),
         ' · costanti: forma ', mk('b', 'gl-mono', f1(meta.tau1), 'taper_meta', 'tau1'), ` gg (${meta.tau1_source}), fatica `,
         mk('b', 'gl-mono', f1(meta.tau2), 'taper_meta', 'tau2'), ` gg (${meta.tau2_source}) · ${meta.deload_weeks} settimane di scarico nello storico`);
+      if (meta.tsb_race != null) {
+        line.append(' · TSB previsto in gara ', mk('b', 'gl-mono', (meta.tsb_race > 0 ? '+' : '') + f1(meta.tsb_race), 'taper_meta', 'tsb_race'));
+      }
       const note = el('div', 'nx-coach');
       note.append(evid(mk('span', null, '', 'taper_meta', 'note'), meta.note));
       info.append(line, note);

@@ -98,7 +98,7 @@
     // analisi predittive
     prontezza: ['gauge', 'lime'], 'carico cuore e struttura': ['scale', 'amber'], carburante: ['drop', 'amber'],
     'carico della corsa': ['scale', 'amber'], 'deriva biomeccanica': ['updown', 'pink'],
-    'forma verso la gara': ['flag', 'magenta'], 'cardiovascolare': ['heart', 'pink'], 'strutturale': ['shoe', 'amber'],
+    'forma verso la gara': ['flag', 'magenta'], 'road to race': ['flag', 'magenta'], 'cardiovascolare': ['heart', 'pink'], 'strutturale': ['shoe', 'amber'],
     'cuore': ['heart', 'pink'], 'struttura': ['shoe', 'amber'],
     // voci del voto del preparatore
     'fc sotto la soglia aerobica': ['heart', 'pink'], 'passo nel range facile': ['timer', 'cyan'], 'durata rispettata': ['clock', 'cyan'],

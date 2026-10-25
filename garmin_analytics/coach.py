@@ -14,6 +14,7 @@ Voto      ogni corsa del blocco viene abbinata al giorno del piano (o, senza pia
 from __future__ import annotations
 
 import json
+import math
 import re
 import sqlite3
 from datetime import date, timedelta
@@ -74,8 +75,12 @@ PURPOSE = {
               "intensita' e' la base di ogni piano di endurance [CONSOLIDATO]; la quota esatta (80/20) e' [EMERGENTE].",
     "soglia": "Conservare la velocita' alla soglia del lattato: nello scarico si taglia il volume ma si mantiene "
               "l'intensita' (Bosquet 2007, meta-analisi) [CONSOLIDATO].",
-    "gara": "Automatizzare il ritmo gara e la percezione dello sforzo, verificando FC e sensazioni al passo "
-            "obiettivo (pratica da allenatore, nessuno studio specifico).",
+    "passo_gara": "Automatizzare il ritmo gara e la percezione dello sforzo, verificando FC e sensazioni al passo "
+                  "obiettivo (pratica da allenatore, nessuno studio specifico).",
+    "vo2": "Alzare il massimo consumo di ossigeno: per 5 e 10 km e' lo stimolo che pesa di piu' sulla prestazione "
+           "[CONSOLIDATO]; ripetute di 2-5 minuti con recuperi brevi.",
+    "tempo": "Spostare in alto la soglia aerobica-anaerobica: il tempo run continuo e' il lavoro tipico della mezza "
+             "[CONSOLIDATO come pratica, evidenza sperimentale limitata].",
     "lungo": "Stimolo di durata specifico: tenere il passo in affaticamento (durability, Jones 2024) [EMERGENTE] "
              "e provare l'alimentazione di gara.",
     "allunghi": "Attivazione neuromuscolare senza fatica: gli allunghi brevi prima della gara sono pratica "
@@ -128,7 +133,7 @@ def _work(day: date, d: int, phase: str, kind: str, title: str, Z: dict, km: flo
     minutes = seg_min + (km - seg_km) * (rest_pace or 0) / 60 if km else 0
     tgt = segments[0] if segments else z
     return {"date": day.isoformat(), "d": d, "phase": phase, "type": kind, "title": title,
-            "purpose": purpose or PURPOSE.get(zone if kind == "qualità" else kind, ""),
+            "purpose": purpose or PURPOSE.get(("passo_gara" if zone == "gara" else zone) if kind == "qualità" else kind, ""),
             "km": round(km, 1) if km else None, "minutes": round(minutes) if km else None, "zone": zone,
             "pace_lo": tgt["pace_lo"] if tgt else None, "pace_hi": tgt["pace_hi"] if tgt else None,
             "hr_lo": round(tgt["hr_lo"]) if tgt else None, "hr_hi": round(tgt["hr_hi"]) if tgt else None,
@@ -145,6 +150,59 @@ def _rest(day: date, d: int, phase: str, note: str = "") -> dict:
     return {"date": day.isoformat(), "d": d, "phase": phase, "type": "riposo", "title": "Riposo",
             "purpose": PURPOSE["riposo"], "km": None, "minutes": None, "zone": None, "pace_lo": None,
             "pace_hi": None, "hr_lo": None, "hr_hi": None, "structure": note, "segments": [], "notes": ""}
+
+
+TAPER_FINAL_CUT = ((7, 0.45), (15, 0.50), (30, 0.55))      # distanza < km -> riduzione finale; oltre 0.60
+
+
+def taper_params(prof: RunProfile, v0: float, race_day: date) -> dict:
+    """
+    Scarico esponenziale (Mujika & Padilla; Bosquet 2007: riduzione del volume del 41-60%, intensita' e frequenza
+    mantenute) [CONSOLIDATO]: volume giornaliero di riferimento V(d) = V0/7 * e^(-k (T - d)), con T = giorni di
+    scarico e k scelto per arrivare alla riduzione finale della distanza il giorno prima della gara.
+    Blocchi: settimana gara (d 1-6, la gara esclusa), scarico 2 (7-13), scarico 1 (14-T).
+    """
+    T = prof.taper_days
+    cut = next((c for lim, c in TAPER_FINAL_CUT if prof.distance_km < lim), 0.60)
+    k = -math.log(1 - cut) / max(T - 1, 1)
+    per_day = lambda d: v0 / 7 * math.exp(-k * (T - d))  # noqa: E731
+    blocks = []
+    for name, lo, hi in (("Settimana gara", 1, 6), ("Scarico 2", 7, 13), ("Scarico 1", 14, T)):
+        ds = [d for d in range(lo, min(hi, T) + 1)]
+        if not ds:
+            continue
+        target = sum(per_day(d) for d in ds)
+        blocks.append({"block": name, "from": (race_day - timedelta(days=max(ds))).isoformat(),
+                       "to": (race_day - timedelta(days=min(ds))).isoformat(), "days": ds,
+                       "target_km": round(target, 1), "reduction_pct": round(100 * (1 - target / (v0 / 7 * len(ds))))
+                       if v0 else None})
+    return {"T": T, "final_cut": cut, "k": k, "v0": v0, "blocks": blocks}
+
+
+def retitle(title: str, old_km: float, new_km: float) -> str:
+    """Aggiorna nel titolo solo i km TOTALI (es. "Lungo 24 km"), mai quelli di un blocco ("con 5 km a passo gara")."""
+    return re.sub(rf"\b{round(old_km):d} km\b(?! a )", f"{round(new_km):d} km", title, count=1)
+
+
+def apply_taper(plan: dict[str, dict], tp: dict, today: date, frozen: set[str], race_day: date) -> None:
+    """Riscala facili e lunghi ancora da fare di ogni blocco per centrare il volume esponenziale (qualita' intatta)."""
+    for b in tp["blocks"]:
+        keys = [(race_day - timedelta(days=d)).isoformat() for d in b["days"]]
+        keys = [k for k in keys if k in plan]
+        movable = [k for k in keys if k >= today.isoformat() and k not in frozen and plan[k]["type"] in ("facile", "lungo")
+                   and plan[k]["d"] > 1 and plan[k].get("km")]
+        fixed = sum(plan[k].get("km") or 0 for k in keys if k not in movable and plan[k]["type"] != "riposo")
+        free = sum(plan[k]["km"] for k in movable)
+        if free > 0:
+            f = float(np.clip((b["target_km"] - fixed) / free, 0.6, 1.3))
+            for k in movable:
+                w = plan[k]
+                new = max(3, round(w["km"] * f))
+                if w.get("minutes"):
+                    w["minutes"] = round(w["minutes"] * new / w["km"])
+                w["title"] = retitle(w["title"], w["km"], new)
+                w["km"] = new
+        b["planned_km"] = round(sum(plan[k].get("km") or 0 for k in keys if plan[k]["type"] != "riposo"), 1)
 
 
 def taper_day(day: date, d: int, Z: dict, prof: RunProfile, s: float, weight: float) -> dict:
@@ -165,9 +223,15 @@ def taper_day(day: date, d: int, Z: dict, prof: RunProfile, s: float, weight: fl
     if d == 4:
         return _work(day, d, phase, "facile", "Facile", Z, E(6), "facile", notes=_race_notes(4, weight, prof))
     if d == 5:
-        seg = [_seg(Z, "gara", 3, 2, 2)]
-        return _work(day, d, phase, "qualità", f"3×2 km a {rp}", Z, 2 + 6 + 1 + 2, "gara",
-                     f"2 km facili + 3×2 km a {rp} (rec 2' facile) + 1-2 km facili", seg, notes=_race_notes(5, weight, prof))
+        # richiamo a passo gara: tensione neuromuscolare senza fatica; il volume a ritmo gara cresce con la distanza
+        reps, dist, rec = sharpener(prof)
+        seg = [_seg(Z, "gara", reps, dist, rec)]
+        label = f"{reps}×{_dist(dist)}"
+        return _work(day, d, phase, "qualità", f"{label} a {rp}", Z, round(4 + reps * dist + (reps - 1) * rec / 5, 1),
+                     "gara", f"2 km facili + {label} a {rp} (rec {rec:g}' facile) + 2 km facili", seg,
+                     purpose="Mantenere l'intensita' riducendo il volume: richiami brevi a ritmo gara conservano la "
+                             "tensione neuromuscolare senza aggiungere fatica (Bosquet 2007, Mujika) [CONSOLIDATO].",
+                     notes=_race_notes(5, weight, prof))
     if d in (2, 6, 9, 13, 15, 20):
         return _rest(day, d, phase, "Riposo o 20-30' di mobilita'" + (": forza leggera ok fino a 10 giorni dalla gara "
                      "[EMERGENTE]" if d >= 10 else ""))
@@ -201,26 +265,82 @@ def taper_day(day: date, d: int, Z: dict, prof: RunProfile, s: float, weight: fl
                  f"facile, ultimi 8-10 km a {rp} se le sensazioni sono buone", notes=_fuel_long(weight))
 
 
+def _dist(km: float) -> str:
+    return f"{km * 1000:.0f} m" if km < 1 or km % 1 else f"{km:g} km"
+
+
+def sharpener(prof: RunProfile) -> tuple[int, float, float]:
+    """Richiamo a passo gara della settimana di gara: ripetute, distanza (km), recupero (min)."""
+    if prof.distance_km < 7:
+        return 5, 0.6, 2
+    if prof.distance_km < 15:
+        return 4, 1.0, 2
+    return 3, 2.0, 2
+
+
+def _sessions(prof: RunProfile, Z: dict) -> tuple[dict, dict]:
+    """Le due sedute di qualita' della settimana di carico, diverse per distanza: (martedi', giovedi')."""
+    rp = prof.race_pace_name
+    if prof.distance_km < 15:
+        # 5 e 10 km: VO2max e soglia anaerobica, recuperi brevi
+        reps, dist, rec = (6, 0.8, 2) if prof.distance_km < 7 else (5, 1.0, 2.5)
+        q1 = {"zone": "vo2", "seg": [_seg(Z, "vo2", reps, dist, rec)], "km": round(4 + reps * dist + (reps - 1) * rec / 5, 1),
+              "title": f"{reps}×{_dist(dist)} a VO2max", "structure": f"2 km facili + {reps}×{_dist(dist)} a VO2max "
+              f"(rec {rec:g}' facile) + 2 km facili"}
+        if prof.distance_km < 7:
+            q2 = {"zone": "gara", "seg": [_seg(Z, "gara", 5, 1.0, 1.5)], "km": 10.0, "title": f"5×1 km a {rp}",
+                  "structure": f"2 km facili + 5×1 km a {rp} (rec 90\" facile) + 2 km facili"}
+        else:
+            q2 = {"zone": "soglia", "seg": [_seg(Z, "soglia", 3, 2.0, 1.5)], "km": 11.0, "title": "3×2 km a soglia",
+                  "structure": "2 km facili + 3×2 km a soglia (rec 90\" facile) + 2 km facili"}
+        return q1, q2
+    q1 = {"zone": "soglia", "seg": [_seg(Z, "soglia", 5, 1.6, 2)], "km": 14.5, "title": "5×1600 m a soglia",
+          "structure": "2 km facili + 5×1600 m a soglia (rec 2' facile) + 2 km facili"}
+    n = 10 if prof.is_marathon else 8          # maratona: ritmo gara lungo; mezza: tempo run continuo
+    q2 = {"zone": "gara", "seg": [_seg(Z, "gara", 1, n, 0)], "km": n + 5.0, "title": f"{n} km a {rp}",
+          "structure": f"3 km facili + {n} km a {rp} + 2 km facili",
+          "purpose": None if prof.is_marathon else PURPOSE["tempo"]}
+    return q1, q2
+
+
 def build_day(day: date, d: int, Z: dict, prof: RunProfile, week_km: float, long_km: float, weight: float) -> dict:
-    """Settimana di carico tipo: soglia il martedi', ritmo gara il giovedi', lungo la domenica."""
+    """
+    Settimana di carico tipo, diversa per distanza (qualita' il martedi' e il giovedi', lungo la domenica):
+      5-10 km   VO2max + soglia (o ritmo 5 km), recuperi brevi, lungo facile
+      mezza     soglia + tempo run, lungo con finale a passo mezza
+      maratona  soglia + ritmo maratona, lungo con blocco a passo maratona una settimana si' e una no
+    """
     wd = day.weekday()
     phase = "Carico"
-    if wd in (0, 4):
+    q1, q2 = _sessions(prof, Z)
+    n_easy = 3 if week_km > 50 else 2          # oltre 50 km/settimana il venerdi' diventa un facile rigenerante
+    if wd == 0 or (wd == 4 and n_easy == 2):
         return _rest(day, d, phase, "Riposo o forza (1-2 sedute/settimana: migliorano l'economia di corsa "
                                     "[CONSOLIDATO])")
-    if wd == 1:
-        seg = [_seg(Z, "soglia", 5, 1.6, 2)]
-        return _work(day, d, phase, "qualità", "5×1600 m a soglia", Z, 2 + 8 + 2.5 + 2, "soglia",
-                     "2 km facili + 5×1600 m a soglia (rec 2' facile) + 2 km facili", seg)
-    if wd == 3:
-        n = 8 if prof.is_marathon else 5
-        seg = [_seg(Z, "gara", 1, n, 0)]
-        return _work(day, d, phase, "qualità", f"{n} km a {prof.race_pace_name}", Z, n + 5, "gara",
-                     f"3 km facili + {n} km a {prof.race_pace_name} + 2 km facili", seg)
+    if wd in (1, 3):
+        q = q1 if wd == 1 else q2
+        return _work(day, d, phase, "qualità", q["title"], Z, q["km"], q["zone"], q["structure"], q["seg"],
+                     purpose=q.get("purpose"))
     if wd == 6:
+        rp = prof.race_pace_name
+        if prof.is_marathon and day.isocalendar()[1] % 2 == 0:
+            mp = min(12, round(long_km * 0.35))
+            seg = [_seg(Z, "gara", 1, mp, 0)]
+            return _work(day, d, phase, "lungo", f"Lungo {long_km:.0f} km con {mp} km a {rp}", Z, long_km, "lungo",
+                         f"facile, poi gli ultimi {mp} km a {rp}: ritmo gara con il glicogeno gia' in calo", seg,
+                         purpose="Specificita' maratona: tenere il ritmo gara a scorte ridotte (durability, Jones 2024) "
+                                 "[EMERGENTE] e provare gel e bevande di gara.", notes=_fuel_long(weight))
+        if prof.distance_km >= 20 and not prof.is_marathon:
+            seg = [_seg(Z, "gara", 1, 5, 0)]
+            return _work(day, d, phase, "lungo", f"Lungo {long_km:.0f} km, ultimi 5 a {rp}", Z, long_km, "lungo",
+                         f"facile, ultimi 5 km a {rp}", seg, notes=_fuel_long(weight))
         return _work(day, d, phase, "lungo", f"Lungo {long_km:.0f} km", Z, long_km, "lungo",
                      "facile, ultimi 20' in progressione", notes=_fuel_long(weight))
-    rest = max(5.0, (week_km - 14.5 - 13 - long_km) / 2)
+    # il volume restante si divide sui facili; nessun facile supera l'80% del lungo
+    rest = min(max(5.0, (week_km - q1["km"] - q2["km"] - long_km) / n_easy), 0.8 * long_km)
+    if wd == 4:
+        return _work(day, d, phase, "facile", "Facile rigenerante", Z, round(min(rest, 8)), "facile",
+                     "corsa molto facile, FC bassa: serve a recuperare per la qualita' del giorno dopo")
     return _work(day, d, phase, "facile", "Facile" + (" + allunghi" if wd == 5 else ""), Z, round(rest), "facile",
                  "corsa facile" + (" + 6 allunghi da 20\"" if wd == 5 else ""))
 
@@ -457,6 +577,20 @@ def grade_long(r: Run, w: Optional[dict], Z: dict, ath: Athlete, prof: RunProfil
         pe = len(end) * 30 / ((end[-1]["dist_km"] - end[0]["dist_km"]) * 1000) * 1000
         slow = (pe / pf - 1) * 100
         hill = r.hilly and not r.treadmill
+        if prof.is_marathon:
+            # maratona: la simmetria d'appoggio sotto fatica e' una delle priorita' del blocco specifico
+            bal = [x["gct_bal"] for x in p[10:] if x.get("gct_bal")]
+            if len(bal) >= 60:
+                k3 = len(bal) // 3
+                bf, bl = float(np.mean(bal[:k3])), float(np.mean(bal[-k3:]))
+                sc = lin(abs(bl - 50), [1, 2, 3, 4], [100, 70, 40, 15])
+                if abs(bl - 50) > abs(bf - 50) and abs(bl - bf) >= 1.5:
+                    sc *= 0.8                     # asimmetria comparsa con la fatica
+                out.append(_comp("Simmetria sotto fatica", 10, sc, f"{bl:.1f}% sx",
+                                 f"appoggio sinistro nell'ultimo terzo (all'inizio {bf:.1f}%)",
+                                 f"Nel finale l'appoggio si sbilancia ({bl:.1f}% sx / {100 - bl:.1f}% dx): in maratona la "
+                                 "simmetria sotto fatica conta; forza di anca e caviglia e lunghi con finale controllato "
+                                 "[PRELIMINARE MA RILEVANTE]."))
         out.append(_comp("Tenuta del passo nel finale", 12 if hill else 30, lin(slow, [0, 2, 4, 7, 10], [100, 90, 65, 30, 10]),
                          f"{slow:+.1f}%", f"ultimo 20% ({fmt_pace(pe)}/km) vs prima meta' ({fmt_pace(pf)}/km)"
                          + ("; peso ridotto: il profilo altimetrico falsa il confronto" if hill else ""),
@@ -542,6 +676,11 @@ def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run
     blocks = sorted(_week_km(runs, taper_start - timedelta(days=7 * i + 6), taper_start - timedelta(days=7 * i))
                     for i in range(4))
     v0 = float(np.mean(blocks[1:]))
+    if v0 < 1:
+        # scarico ancora lontano: le settimane prima dello scarico sono nel futuro, il riferimento e' il volume reale
+        # delle ultime 3 settimane
+        recent = [_week_km(runs, today - timedelta(days=7 * i + 7), today - timedelta(days=7 * i + 1)) for i in range(3)]
+        v0 = float(np.mean(recent))
     s = float(np.clip(v0 / 60, 0.6, 1.3)) if v0 else 1.0
 
     def est_for(day: date) -> dict:
@@ -580,6 +719,10 @@ def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run
                 plan[k] = {x: v for x, v in store["pinned"][k].items() if x not in ("status", "activity_id", "grade", "warning")
                            and not x.startswith("done_")}
         day += timedelta(days=1)
+
+    # 1b) scarico esponenziale: volume dei giorni ancora da fare riportato sulla curva (gli adattati restano)
+    taper = taper_params(prof, v0, race_day)
+    apply_taper(plan, taper, today, set(store["pinned"]), race_day)
 
     # 2) abbinamento delle corse e voti
     Zt = zones(ath, prof, est_for(today + timedelta(days=1))["central_s"])
@@ -687,6 +830,9 @@ def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run
         g = next((x for x in grades if x["date"] == k), None)
         return g["type"] if g else plan.get(k, {}).get("type")
 
+    # fotografia dei giorni futuri prima degli adattamenti: serve a mostrare "prima -> dopo"
+    baseline = {k: (w["title"], w.get("km"), w["type"]) for k, w in plan.items() if k >= today.isoformat()}
+
     # allenamenti rimasti senza giorno (al loro posto ne hai fatto un altro): si ridistribuiscono nella settimana
     displaced = [k for k in sorted(plan) if week_start <= k <= today.isoformat()
                  and plan[k]["status"] == "sostituito" and plan[k]["type"] not in ("riposo", "gara")]
@@ -768,7 +914,7 @@ def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run
 
     def set_km(k: str, km: float) -> None:
         w = plan[k]
-        w["title"] = re.sub(r"\b\d+ km\b", f"{km:.0f} km", w["title"], count=1)
+        w["title"] = retitle(w["title"], w["km"] or km, km)
         w["km"] = km
         if w.get("minutes") and w.get("pace_lo"):
             w["minutes"] = round(km * (w["pace_lo"] + w["pace_hi"]) / 2 / 60)
@@ -823,8 +969,24 @@ def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run
             set_km(slot, round((src["km"] or 16) * 0.85))
             note(slot, f"lungo del {date.fromisoformat(lk):%d/%m} saltato: recuperato qui al 85%")
             note(lk, f"recuperato il {date.fromisoformat(slot):%d/%m}")
+        elif plan[lk]["d"] > prof.taper_days:
+            # fase di carico: il volume perso si spalma sui facili successivi, senza toccare i giorni duri
+            lost = plan[lk].get("km") or 0
+            # qualche km facile in piu' va bene anche vicino a una qualita', non il giorno prima di un lungo o della gara
+            easy = [k for k in future() if k <= (date.fromisoformat(lk) + timedelta(days=7)).isoformat()
+                    and plan[k]["type"] == "facile" and plan[k]["d"] > prof.taper_days
+                    and kind_on(date.fromisoformat(k) + timedelta(days=1)) not in ("lungo", "gara")][:2]
+            add = min(3, round(0.25 * lost))
+            if easy and add:
+                for k in easy:
+                    set_km(k, plan[k]["km"] + add)
+                    note(k, f"+{add} km dal lungo saltato il {date.fromisoformat(lk):%d/%m}")
+                where = "sul facile successivo" if len(easy) == 1 else f"su ciascuno dei {len(easy)} facili successivi"
+                note(lk, f"volume in parte recuperato: +{add} km {where}, senza aggiungere giorni duri")
+            else:
+                note(lk, "non recuperato: nessun facile adatto nei 7 giorni successivi")
         else:
-            note(lk, "non recuperato: troppo vicino alla gara o a un altro allenamento duro")
+            note(lk, "non recuperato: troppo vicino alla gara (nello scarico il volume perso non si recupera)")
 
     # 3) ultima corsa piu' intensa del previsto: il prossimo allenamento duro slitta di un giorno o si alleggerisce
     if last_run_day and last_run_day >= (today - timedelta(days=1)).isoformat():
@@ -913,6 +1075,15 @@ def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run
                 set_km(k, round(plan[k]["km"] * 0.85))
                 note(k, f"{why}: lungo accorciato del 15%, su percorso pianeggiante e senza discese veloci")
 
+    # com'era il giorno prima della modifica (resta nei giorni adattati anche nei ricalcoli successivi)
+    for k in touched:
+        b = baseline.get(k)
+        w = plan.get(k)
+        if not b or not w or w.get("changed_from") or (w["title"], w.get("km"), w["type"]) == b:
+            continue
+        w["changed_from"] = b[0] + (f" · {b[1]:g} km" if b[1] and f"{b[1]:g} km" not in b[0] else "")
+        w["changed_on"] = today.isoformat()
+
     # 4) salva i giorni passati come proposti (con stato aggiornato) e prepara le righe
     pinned = {k: plan[k] for k in set(store["pinned"]) | touched if k in plan and k >= today.isoformat()}
     store = {"start": start.isoformat(), "days": {k: w for k, w in plan.items() if date.fromisoformat(k) < today},
@@ -930,6 +1101,14 @@ def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run
             "activity_id": w.get("activity_id"), "grade": w.get("grade"), "adapted": w.get("adapted"),
             "done_km": w.get("done_km"), "done_pace_s": w.get("done_pace_s"), "done_hr": w.get("done_hr"),
             "done_note": w.get("done_note"), "warning": w.get("warning"),
-            "generated_on": w.get("generated_on"),
+            "generated_on": w.get("generated_on"), "changed_from": w.get("changed_from"), "changed_on": w.get("changed_on"),
         })
-    return {"plan": rows, "grades": grades, "grade_parts": parts, "zones": zone_rows(Zt)}
+    taper_rows = []
+    for b in taper["blocks"]:
+        keys = [(race_day - timedelta(days=d)).isoformat() for d in b["days"]]
+        planned = sum(plan[k].get("km") or 0 for k in keys if k in plan and plan[k]["type"] != "riposo")
+        taper_rows.append({"block": b["block"], "start": b["from"], "end": b["to"], "target_km": b["target_km"],
+                           "planned_km": round(planned, 1), "reduction_pct": b["reduction_pct"],
+                           "pre_taper_week_km": round(taper["v0"], 1), "final_cut_pct": round(100 * taper["final_cut"]),
+                           "taper_days": taper["T"]})
+    return {"plan": rows, "grades": grades, "grade_parts": parts, "zones": zone_rows(Zt), "taper_plan": taper_rows}

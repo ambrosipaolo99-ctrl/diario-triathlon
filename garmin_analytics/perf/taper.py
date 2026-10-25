@@ -22,9 +22,11 @@ il picco e' il mattino di massima prestazione tra oggi e il giorno della gara (d
 carico e la curva salirebbe solo per il riposo). Il grafico prosegue 7 giorni oltre la gara.
 
 Righe esportate
-  taper       date, tss, projected, fitness, fatigue, perf, perf_idx, is_race, is_peak
+  taper       date, tss, projected, fitness, fatigue, perf, tsb, perf_idx, is_race, is_peak
   taper_meta  tau1, tau2, r2_fitness, r2_fatigue, tau1_source, tau2_source, deload_weeks, race_date,
-              peak_date, gap_days, note
+              peak_date, gap_days, tsb_race, note
+TSB (CTL 42 gg - ATL 7 gg) al mattino della gara: per una maratona di solito tra +5 e +25, pratica diffusa con
+evidenza limitata [PRELIMINARE MA RILEVANTE].
 """
 from __future__ import annotations
 
@@ -136,13 +138,20 @@ def model(conn: sqlite3.Connection, goal: Optional[dict], plan: list[dict], ef_p
     morning = np.concatenate([[0.0], load[:-1]])            # prestazione al mattino: carico fino a ieri
     fit, fat = _impulse(morning, tau1), _impulse(morning, tau2)
     perf = K1 * fit - K2 * fat
+    # TSB classico (CTL 42 gg - ATL 7 gg, medie esponenziali) sullo stesso carico, al mattino
+    ctl = atl = 0.0
+    tsb = np.empty(len(load))
+    for i, w in enumerate(morning):
+        ctl += (w - ctl) / 42
+        atl += (w - atl) / 7
+        tsb[i] = ctl - atl
     window = [i for i, day in enumerate(days) if today <= day.date() <= race]
     peak_i = max(window, key=lambda i: perf[i]) if window else None
     shown = [i for i, d in enumerate(days) if d.date() >= today - timedelta(days=60)]
     lo, hi = min(perf[i] for i in shown), max(perf[i] for i in shown)
 
     rows = [{"date": days[i].date().isoformat(), "tss": round(load[i], 1), "projected": projected[i],
-             "fitness": round(fit[i], 1), "fatigue": round(fat[i], 1), "perf": round(perf[i], 1),
+             "fitness": round(fit[i], 1), "fatigue": round(fat[i], 1), "perf": round(perf[i], 1), "tsb": round(tsb[i], 1),
              "perf_idx": round(100 * (perf[i] - lo) / (hi - lo), 1) if hi > lo else None,
              "is_race": days[i].date() == race, "is_peak": i == peak_i} for i in shown]
     peak = days[peak_i].date() if peak_i is not None else None
@@ -163,5 +172,6 @@ def model(conn: sqlite3.Connection, goal: Optional[dict], plan: list[dict], ef_p
     meta = [{"tau1": tau1, "tau2": tau2, "r2_fitness": round(best1[1], 2), "r2_fatigue": round(best2[1], 2),
              "tau1_source": src1, "tau2_source": src2, "deload_weeks": n_deload, "race_date": race.isoformat(),
              "peak_date": peak.isoformat() if peak else None, "gap_days": gap, "k1": K1, "k2": K2,
+             "tsb_race": round(float(tsb[ri]), 1) if ri is not None else None,
              "note": note + " Modello di Banister: schema consolidato, previsione individuale [PRELIMINARE MA RILEVANTE]."}]
     return rows, meta

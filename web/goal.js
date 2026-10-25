@@ -229,7 +229,7 @@ dash.calc('race_delta', {
       });
       sumCard.append(ul);
     }
-    host.replaceChildren(sumCard, ...weeks.map(([week, days]) => {
+    host.replaceChildren(timeline(p.data), sumCard, ...weeks.map(([week, days]) => {
       const card = el('div', 'nx-card gl-week');
       const head = el('div', 'nx-card-head');
       const end = new Date(parseDay(week).getTime() + 6 * 864e5);
@@ -250,6 +250,65 @@ dash.calc('race_delta', {
       card.append(head, ...days.map(dayRow));
       return card;
     }));
+  }
+
+  // timeline verticale dei prossimi giorni: cosa cambia, rispetto a cosa, e perche'
+  function timeline(plan) {
+    const card = el('div', 'nx-card rt-card');
+    const tp = dash.data('taper_plan');
+    const head = el('div', 'nx-card-head');
+    head.append(el('h3', null, 'Road to Race'), el('span', 'nx-note', 'prossimi 14 giorni · si ricalcola a ogni sincronizzazione'));
+    card.append(head);
+    const now = Date.now();
+    const next = plan.filter((r) => r.status === 'oggi' || r.status === 'da fare').slice(0, 14);
+    const fresh = next.filter((r) => r.changed_on && now - Date.parse(r.changed_on) <= 2 * 864e5);
+    if (fresh.length) {
+      const b = el('div', 'rt-banner');
+      b.append(el('b', null, `↻ Il piano è cambiato: ${fresh.length} giorn${fresh.length === 1 ? 'o' : 'i'} `),
+        `in risposta agli ultimi allenamenti (${fmtDay(parseDay(fresh[0].changed_on))}).`);
+      card.append(b);
+    }
+    if (tp.status === 'ok' && tp.data.length) {
+      const blocks = el('div', 'rt-taper');
+      tp.data.slice().reverse().forEach((b) => {
+        const w = 'block=' + b.block;
+        const x = el('div', 'rt-block');
+        const on = now >= Date.parse(b.start) && now <= Date.parse(b.end) + 864e5;
+        if (on) x.classList.add('rt-block-on');
+        x.append(mk('span', 'rt-block-name', b.block, 'taper_plan', 'block', w),
+          mk('b', 'gl-mono', `−${b.reduction_pct}%`, 'taper_plan', 'reduction_pct', w),
+          el('span', 'nx-note', `${f1(b.planned_km)} / ${f1(b.target_km)} km`));
+        blocks.append(x);
+      });
+      card.append(blocks, evidText(el('p', 'nx-note'), `Scarico esponenziale: volume ridotto fino al −${tp.data[0].final_cut_pct}% il giorno prima della gara, intensità e frequenza mantenute (Bosquet 2007) [CONSOLIDATO].`));
+    }
+    const list = el('ol', 'rt-list');
+    next.forEach((r) => {
+      const where = 'date=' + r.date;
+      const ty = TYPE[r.type] || { label: r.type, color: N.muted };
+      const li = el('li', 'rt-item' + (r.changed_from ? ' rt-changed' : '') + (r.status === 'oggi' ? ' rt-today' : ''));
+      li.style.setProperty('--rt', ty.color);
+      const when = el('div', 'rt-when');
+      when.append(el('b', null, r.status === 'oggi' ? 'Oggi' : fmtDow(parseDay(r.date))), el('span', 'nx-note', r.d === 0 ? 'gara' : `−${r.d} gg`));
+      const what = el('div', 'rt-what');
+      const top = el('div', 'rt-title');
+      const chip = mk('span', 'gl-type', ty.label, 'goal_plan', 'type', where); chip.style.color = ty.color;
+      top.append(chip, mk('b', null, r.title, 'goal_plan', 'title', where));
+      if (r.km) top.append(el('span', 'nx-note', ` · ${f1(r.km)} km`));
+      if (r.changed_on && now - Date.parse(r.changed_on) <= 2 * 864e5) top.append(el('span', 'rt-new', 'nuovo'));
+      what.append(top);
+      if (r.changed_from) {
+        const ch = el('div', 'rt-diff');
+        ch.append(el('span', 'nx-note', 'prima: '), mk('s', null, r.changed_from, 'goal_plan', 'changed_from', where));
+        what.append(ch);
+      }
+      if (r.adapted) what.append(mk('p', 'rt-why', '↻ ' + r.adapted, 'goal_plan', 'adapted', where));
+      if (r.warning) what.append(mk('p', 'gl-warn-note', '⚠ ' + r.warning, 'goal_plan', 'warning', where));
+      li.append(when, what);
+      list.append(li);
+    });
+    card.append(list);
+    return card;
   }
 
   function dayRow(r) {

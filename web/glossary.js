@@ -94,6 +94,7 @@
     grassi: 'Grammi di grassi bruciati: soprattutto alle andature facili.',
     'glicogeno usato': 'Quota delle scorte di zuccheri nei muscoli e nel fegato consumata (stima ~7 g/kg).',
     'deriva biomeccanica': "Come cambia il gesto con la fatica: cadenza, contatto, oscillazione e simmetria nell'ultimo terzo.",
+    'road to race': "Il piano dei prossimi 14 giorni: si ricalcola a ogni sincronizzazione e mostra cosa è cambiato rispetto a prima, e perché.",
     'forma verso la gara': 'Modello forma-fatica: proietta il piano fino alla gara e mostra quando sarai più in forma.',
   };
   const SEL = '.nx-stat > span:first-child, .gx-tile-name, .nx-sec-name, .gl-part-name > b, .nx-card-head > h3, .gx-dl dt, '
