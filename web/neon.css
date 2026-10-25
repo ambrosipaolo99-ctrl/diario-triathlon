@@ -326,7 +326,8 @@
 
 /* Icone: tratto laser sottile, tono dalla palette neon, alone leggero che si accende al passaggio */
 .nx-ic {
-  width: 1.15em; height: 1.15em; flex: none; vertical-align: -0.2em; margin-right: .5em;
+  /* inline-block esplicito: claude.ai rende ogni svg un blocco e l'icona finirebbe su una riga a se' */
+  display: inline-block; width: 1.15em; height: 1.15em; flex: none; vertical-align: -0.2em; margin-right: .5em;
   fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
   color: var(--nx-cyan); overflow: visible;
   filter: drop-shadow(0 0 2px color-mix(in srgb, currentColor 65%, transparent));
