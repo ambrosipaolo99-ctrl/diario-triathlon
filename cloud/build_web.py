@@ -43,8 +43,18 @@ def fix(name: str, text: str) -> str:
 
 
 def icons() -> None:
-    """Icona dell'app: tracciato del battito al neon su fondo scuro."""
+    """Icona dell'app: web_src/app-icon.png (quadrata, fondo nero) se c'e', altrimenti un tracciato del battito al neon."""
     from PIL import Image, ImageDraw, ImageFilter
+    custom = SHELL / "app-icon.png"
+    if custom.exists():
+        src = Image.open(custom).convert("RGBA")
+        side = min(src.size)
+        src = src.crop(((src.width - side) // 2, (src.height - side) // 2, (src.width + side) // 2, (src.height + side) // 2))
+        img = Image.new("RGB", src.size, (0, 0, 0))
+        img.paste(src, mask=src.getchannel("A"))          # iOS non accetta trasparenze: fondo nero pieno
+        for size in (180, 192, 512):
+            img.resize((size, size), Image.LANCZOS).save(OUT / f"icon-{size}.png", optimize=True)
+        return
     base = 1024
     pts = [(2, 12), (6, 12), (8.5, 7), (12.5, 17), (15, 12), (22, 12)]
     img = Image.new("RGB", (base, base), (7, 10, 18))

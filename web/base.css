@@ -34,6 +34,7 @@ body { font-family: var(--font-anthropic-sans); font-size: var(--cds-font-size-b
   background: #0c1120; border: 1px solid #1c2746; border-radius: 16px; box-shadow: 0 0 30px #22e5ff1f; }
 .lock-logo { width: 44px; height: 44px; fill: none; stroke: #22e5ff; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
   filter: drop-shadow(0 0 3px #22e5ff) drop-shadow(0 0 10px #22e5ff88); }
+.lock-logo-img { width: 84px; height: 84px; border-radius: 20px; box-shadow: 0 0 24px #22e5ff33; }
 .lock-card h1 { margin: 0; font-family: var(--font-anthropic-serif); font-weight: 400; font-size: 28px; text-shadow: 0 0 18px #22e5ff55; }
 .lock-text, .lock-note, #lock-msg { margin: 0; color: #8391b8; font-size: 13px; }
 #lock-msg { min-height: 1.2em; color: #ffb22e; }

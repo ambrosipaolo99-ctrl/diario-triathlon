@@ -353,6 +353,17 @@
   font: 600 28px/1 ui-monospace, monospace; letter-spacing: .1em; box-shadow: 0 0 30px #22e5ff44; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
 .px-tap-pad:active { background: #22e5ff33; }
 
+/* Glossario: etichette toccabili e riquadro con la spiegazione */
+.nx-gl { cursor: help; text-decoration: underline dotted rgba(131, 145, 184, .55); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.nx-gl:hover, .nx-gl:focus-visible { text-decoration-color: #22e5ff; outline: none; }
+.nx-gloss { position: fixed; z-index: 120; background: #0c1120; color: #e8f1ff; border: 1px solid #22e5ff66; border-radius: 12px;
+  padding: 10px 12px; box-shadow: 0 0 18px #22e5ff33, 0 10px 30px rgba(0, 0, 0, .6); font-family: var(--font-anthropic-sans, system-ui, sans-serif);
+  font-size: 13px; line-height: 1.45; text-transform: none; letter-spacing: 0; }
+.nx-gloss b { display: block; color: #22e5ff; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+.nx-gloss p { margin: 0; }
+@media (prefers-reduced-motion: no-preference) { .nx-gloss { animation: nx-gloss-in .18s ease-out; } }
+@keyframes nx-gloss-in { from { opacity: 0; transform: translateY(-4px); } }
+
 /* Icone: tratto laser sottile, tono dalla palette neon, alone leggero che si accende al passaggio */
 .nx-ic {
   /* inline-block esplicito: claude.ai rende ogni svg un blocco e l'icona finirebbe su una riga a se' */

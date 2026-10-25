@@ -157,4 +157,5 @@
   }).observe(root, { childList: true, subtree: true, characterData: true });
   decorate(root);
   window.nxIcon = icon;
+  window.nxKey = key;            // stessa normalizzazione dei testi, usata anche dal glossario
 })();
