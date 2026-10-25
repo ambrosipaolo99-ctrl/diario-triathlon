@@ -118,6 +118,10 @@ def _main(a: argparse.Namespace, run: Run, log: io.StringIO) -> None:
         if api is not None:
             run.step("sincronizzazione wellness", sync_wellness, api, days=SYNC_DAYS, conn=conn)
             run.step("sincronizzazione attivita'", sync_activities, api, days=SYNC_DAYS, conn=conn)
+            redo = reanalyze_days()
+            if redo:
+                # su richiesta (avvio manuale): rianalisi con nuovo download dei FIT, es. dopo un cambio dell'analisi
+                run.step(f"rianalisi {redo} giorni", sync_activities, api, days=redo, conn=conn, reanalyze=True)
             with contextlib.suppress(Exception):
                 api.client.dump(str(Path(os.environ["GARMIN_TOKEN_DIR"])))   # token rinnovati nello stato
 
@@ -131,6 +135,12 @@ def _main(a: argparse.Namespace, run: Run, log: io.StringIO) -> None:
         blob = run.step("salvataggio stato", state.pack, root, key)
         if blob:
             a.state_out.write_bytes(blob)
+
+
+def reanalyze_days() -> int:
+    """REANALYZE_DAYS arriva dall'input del workflow: solo un intero tra 0 e 400, tutto il resto vale 0."""
+    raw = (os.environ.get("REANALYZE_DAYS") or "0").strip()
+    return int(raw) if raw.isdigit() and 0 < int(raw) <= 400 else 0
 
 
 def write_data(paths: dict, root: Path, dkey: bytes, salt: bytes, run: Run, log: io.StringIO, out: Path) -> None:

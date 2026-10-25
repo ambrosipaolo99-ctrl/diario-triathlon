@@ -6,6 +6,11 @@ on:
     - cron: "15 5 * * *"     # 07:15 ora legale italiana (06:15 solare): recupero del mattino
     - cron: "15 17 * * *"    # 19:15 ora legale (18:15 solare): allenamenti del giorno
   workflow_dispatch:
+    inputs:
+      rianalizza_giorni:
+        description: "Rianalizza le attivita' degli ultimi N giorni riscaricando i FIT (0 = no)"
+        required: false
+        default: "0"
 
 permissions: {}
 
@@ -51,6 +56,8 @@ jobs:
           DATA_PASSPHRASE: ${{ secrets.DATA_PASSPHRASE }}
           GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
           GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          # l'input passa solo da una variabile d'ambiente (mai dentro lo script) e run.py accetta solo un intero
+          REANALYZE_DAYS: ${{ inputs.rianalizza_giorni }}
           GARMIN_DATA_DIR: ${{ runner.temp }}/state/data
           GARMIN_TOKEN_DIR: ${{ runner.temp }}/state/tokens
           TZ: Europe/Rome

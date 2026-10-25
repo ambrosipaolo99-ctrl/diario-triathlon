@@ -523,7 +523,9 @@ def _week_km(runs: list[Run], start: date, end: date) -> float:
 
 
 def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run], ath: Athlete,
-          est_by_day: dict[str, dict], window_start: date, today: Optional[date] = None) -> dict[str, list[dict]]:
+          est_by_day: dict[str, dict], window_start: date, today: Optional[date] = None,
+          impact: Optional[dict] = None) -> dict[str, list[dict]]:
+    """`impact`: protezione strutturale attiva ({until, reason}, da perf.load_vectors) o None."""
     today = today or date.today()
     race_day = date.fromisoformat(goal["date"])
     # days: giorni passati come proposti; pinned: giorni futuri gia' adattati; applied: adattamenti gia' fatti
@@ -900,6 +902,17 @@ def coach(conn: sqlite3.Connection, goal: dict, prof: RunProfile, runs: list[Run
                 # per domani solo un avviso (non salvato): decide il dato di domattina
                 plan[k]["warning"] = (f"{why} il {date.fromisoformat(rec['date']):%d/%m}: se domattina il recupero è "
                                       "ancora sotto 45, rifai l'export e il piano lo rimanda di un giorno")
+
+    # 7) carico strutturale alto con carico cardiaco basso (collina, discese): niente lavoro ad alto impatto per 48 h
+    if impact:
+        k = next((k for k in future() if k <= impact["until"] and plan[k]["type"] in ("qualità", "lungo")), None)
+        if k and once(f"impact:{impact['until']}"):
+            why = "carico strutturale alto nelle ultime 48 h (gambe sollecitate, cuore poco)"
+            if plan[k]["type"] == "qualità":
+                to_easy(k, 0.8, why)
+            elif plan[k].get("km"):
+                set_km(k, round(plan[k]["km"] * 0.85))
+                note(k, f"{why}: lungo accorciato del 15%, su percorso pianeggiante e senza discese veloci")
 
     # 4) salva i giorni passati come proposti (con stato aggiornato) e prepara le righe
     pinned = {k: plan[k] for k in set(store["pinned"]) | touched if k in plan and k >= today.isoformat()}

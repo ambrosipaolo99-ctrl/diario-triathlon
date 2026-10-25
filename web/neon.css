@@ -324,6 +324,34 @@
   .nx-ring .arc, .nx-sec .arc { transition: stroke-dashoffset var(--cds-dur-slow) var(--cds-ease-out); }
 }
 
+/* Analisi predittive: prontezza, carico a due vettori, carburante, deriva */
+.px-ready { gap: var(--cds-gap-md); }
+.px-ready-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: var(--cds-gap-md); }
+.px-sys { display: flex; align-items: center; gap: var(--cds-gap-md); background: var(--nx-panel-2); border: 1px solid var(--nx-line); border-radius: var(--cds-radius); padding: var(--cds-pad-md); min-width: 0; }
+.px-ring { width: 96px; height: 96px; }
+.px-ring .nx-ring-val b { font-size: 1.6rem; }
+.px-sys-name { font-size: var(--cds-font-size-caption); text-transform: uppercase; letter-spacing: .1em; color: var(--nx-muted); }
+.px-state { display: block; font-family: var(--nx-mono); font-size: 1.15rem; text-transform: uppercase; letter-spacing: .06em; margin: 2px 0 4px; }
+.px-btns { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs); margin-top: var(--cds-gap-xs); }
+.px-matrix { display: grid; grid-template-columns: auto 1fr 1fr; gap: 6px; align-items: stretch; }
+.px-mx-h { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--nx-muted); align-self: center; text-align: center; }
+.px-mx-cell { font-family: var(--nx-mono); font-size: .8rem; text-transform: uppercase; letter-spacing: .1em; text-align: center; padding: 10px 6px;
+  border: 1px solid var(--nx-line); border-radius: 8px; opacity: .35; transition: opacity .3s ease, box-shadow .3s ease; }
+.px-mx-cell.px-half { opacity: .7; border-style: dashed; border-color: currentColor; }
+.px-mx-cell.px-on { opacity: 1; border-color: currentColor; box-shadow: 0 0 14px color-mix(in srgb, currentColor 45%, transparent), inset 0 0 10px color-mix(in srgb, currentColor 20%, transparent); }
+.px-advice br + .nx-note { margin-left: 0; }
+.px-impact { border: 1px solid #ffb22e66; color: var(--nx-amber); border-radius: 8px; padding: 8px 10px; font-size: var(--cds-font-size-caption); }
+.px-fuel .nx-stats { grid-template-columns: repeat(auto-fit, minmax(min(100%, 6.5rem), 1fr)); }
+.px-split { display: flex; height: 22px; border-radius: 6px; overflow: hidden; gap: 2px; }
+.px-split-seg { min-width: 3px; font-size: .68rem; font-family: var(--nx-mono); color: #070a12; display: flex; align-items: center; justify-content: center; white-space: nowrap; overflow: hidden; }
+.px-drift td.num, .px-drift th.num { text-align: right; }
+.px-vec-chart { min-height: 140px; }
+.px-tap { position: fixed; inset: 0; z-index: 100; background: rgba(7, 10, 18, .97); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px; }
+.px-tap-msg { color: var(--nx-text, #e8f1ff); text-align: center; max-width: 22rem; margin: 0; font-size: 15px; }
+.px-tap-pad { width: min(78vw, 300px); height: min(78vw, 300px); border-radius: 50%; border: 2px solid #22e5ff; background: #22e5ff14; color: #22e5ff;
+  font: 600 28px/1 ui-monospace, monospace; letter-spacing: .1em; box-shadow: 0 0 30px #22e5ff44; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.px-tap-pad:active { background: #22e5ff33; }
+
 /* Icone: tratto laser sottile, tono dalla palette neon, alone leggero che si accende al passaggio */
 .nx-ic {
   /* inline-block esplicito: claude.ai rende ogni svg un blocco e l'icona finirebbe su una riga a se' */

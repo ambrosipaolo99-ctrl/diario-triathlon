@@ -186,12 +186,44 @@ def _it(v):
     return re.sub(r"\b(\w*([aeiou]))'(?=[\s.,;:)\]]|$)", fix, v)
 
 
-def _goal(conn: sqlite3.Connection) -> dict[str, list[dict]]:
-    out = _goal_rows(conn)
+def _goal(conn: sqlite3.Connection, impact: dict | None = None) -> dict[str, list[dict]]:
+    out = _goal_rows(conn, impact)
     return {k: [{c: _it(x) for c, x in r.items()} for r in rows] for k, rows in out.items()}
 
 
-def _goal_rows(conn: sqlite3.Connection) -> dict[str, list[dict]]:
+def _perf_base(conn: sqlite3.Connection) -> dict:
+    """Corse con serie, atleta e carico a due vettori: servono prima del piano (protezione strutturale)."""
+    from .perf import common, load_vectors
+    from .race import athlete
+    ath = athlete(conn)
+    runs = common.load_runs(conn, DATA_START)
+    run_load = load_vectors.run_rows(runs, ath)
+    today = date.today()
+    start = date.fromisoformat(run_load[0]["date"]) if run_load else today
+    daily = load_vectors.daily_rows(run_load, start, today)
+    return {"ath": ath, "runs": runs, "weight": common.athlete_weight(conn), "run_load": run_load, "daily": daily,
+            "impact": load_vectors.impact_until(daily, today)}
+
+
+def _perf(conn: sqlite3.Connection, since: str, base: dict, goal: dict[str, list[dict]]) -> dict[str, list[dict]]:
+    from .perf import biomech, fuel, readiness, taper
+    active = next((g for g in goal["goals"] if g.get("status") == "attivo" and g.get("discipline") == "corsa"), None)
+    runs = base["runs"]
+    taper_rows, taper_meta = taper.model(conn, active, goal["goal_plan"],
+                                         [(r.day.isoformat(), r.ef) for r in runs
+                                          if r.ef and r.steady and not r.treadmill and r.moving_s >= 1200])
+    out = {
+        "run_load": [r for r in base["run_load"] if r["date"] >= since],
+        "load_vectors": [r for r in base["daily"] if r["date"] >= since],
+        "readiness": readiness.rows(conn, since, base["daily"]),
+        "fuel": [r for r in fuel.rows(runs, base["ath"], base["weight"], goal["goal_plan"]) if r["date"] >= since],
+        "biomech": [r for r in biomech.rows(runs) if r["date"] >= since],
+        "taper": taper_rows, "taper_meta": taper_meta,
+    }
+    return {k: [{c: _it(x) for c, x in r.items()} for r in rows] for k, rows in out.items()}
+
+
+def _goal_rows(conn: sqlite3.Connection, impact: dict | None = None) -> dict[str, list[dict]]:
     """Obiettivi, stima gara giorno per giorno, zone, piano e voti dell'obiettivo attivo."""
     from .coach import coach
     from .goals import active_goal, goal_rows, goal_window_start, load_goals, run_profile
@@ -231,7 +263,7 @@ def _goal_rows(conn: sqlite3.Connection) -> dict[str, list[dict]]:
                            for m in last["methods"]]
     out["race_factors"] = [{"key": i, "text": f["text"], "impact": f["impact"], "as_of": last["as_of"]}
                            for i, f in enumerate(last["factors"])]
-    res = coach(conn, goal, prof, runs, ath, {e["as_of"]: e for e in est}, start, today)
+    res = coach(conn, goal, prof, runs, ath, {e["as_of"]: e for e in est}, start, today, impact=impact)
     out["goal_zones"] = [{**z, "pace_fmt": rng(z["pace_lo"], z["pace_hi"]), "hr_fmt": f"{z['hr_lo']}–{z['hr_hi']}"}
                          for z in res["zones"]]
     out["goal_plan"] = [{**p, "goal_id": goal["id"], "pace_fmt": rng(p["pace_lo"], p["pace_hi"]),
@@ -258,8 +290,11 @@ def export_dashboard(conn: sqlite3.Connection | None = None, days: int = 365, ou
         paths[name] = _write(name, rows, out_dir)
     weeks = [w for w in weekly_recovery(conn) if w["week_end"] >= since]
     paths["recovery_weekly"] = _write("recovery_weekly", weeks, out_dir)
-    goal = _goal(conn)
+    base = _perf_base(conn)
+    goal = _goal(conn, base["impact"])
     for name, rows in goal.items():
+        paths[name] = _write(name, rows, out_dir)
+    for name, rows in _perf(conn, since, base, goal).items():
         paths[name] = _write(name, rows, out_dir)
     today, today_parts = today_rows(conn, goal["goal_grades"], goal["goal_grade_parts"])
     paths["today"] = _write("today", [{c: _it(x) for c, x in r.items()} for r in today], out_dir)

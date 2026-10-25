@@ -239,8 +239,10 @@ def _stream(d: pd.DataFrame) -> list[dict]:
     agg["dist_km"] = g["dist_km"].last()
     agg["t_min"] = g["t"].first() / 60
     agg["pace_s"] = 1000 / agg["speed"].where(agg["speed"] > MOVING_SPEED)
-    cols = [c for c in ("t_min", "dist_km", "pace_s", "hr", "cad", "gct", "vo", "vr", "step", "power", "alt") if c in agg]
-    return [{c: rnd(r[c], 3 if c in ("dist_km", "step") else 1) for c in cols} for _, r in agg.iterrows()]
+    cols = [c for c in ("t_min", "dist_km", "pace_s", "hr", "cad", "gct", "vo", "vr", "step", "power", "alt", "gct_bal")
+            if c in agg]
+    return [{c: rnd(r[c], 3 if c in ("dist_km", "step") else 2 if c == "gct_bal" else 1) for c in cols}
+            for _, r in agg.iterrows()]
 
 
 def _splits(d: pd.DataFrame, altitude_ok: bool) -> list[dict]:

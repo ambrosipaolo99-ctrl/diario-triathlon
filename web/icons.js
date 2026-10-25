@@ -95,6 +95,11 @@
     'bilanciamento dx/sx': ['scale', 'cyan'], 'efficienza vs storico': ['trend', 'lime'], 'passo vs css': ['timer', 'cyan'],
     'passo vs storico': ['trend', 'lime'], 'costanza swolf': ['wave', 'violet'], 'costanza frequenza bracciata': ['repeat', 'violet'],
     'stabilita passo': ['equal', 'cyan'], tenuta: ['shield', 'lime'],
+    // analisi predittive
+    prontezza: ['gauge', 'lime'], 'carico cuore e struttura': ['scale', 'amber'], carburante: ['drop', 'amber'],
+    'carico della corsa': ['scale', 'amber'], 'deriva biomeccanica': ['updown', 'pink'],
+    'forma verso la gara': ['flag', 'magenta'], 'cardiovascolare': ['heart', 'pink'], 'strutturale': ['shoe', 'amber'],
+    'cuore': ['heart', 'pink'], 'struttura': ['shoe', 'amber'],
     // voci del voto del preparatore
     'fc sotto la soglia aerobica': ['heart', 'pink'], 'passo nel range facile': ['timer', 'cyan'], 'durata rispettata': ['clock', 'cyan'],
     'passo delle ripetute': ['timer', 'magenta'], 'regolarita tra le ripetute': ['equal', 'cyan'], 'fc coerente con lo sforzo': ['heart', 'pink'],

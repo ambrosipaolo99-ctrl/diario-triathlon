@@ -1,7 +1,7 @@
 // Service worker: l'app si apre anche offline (ultimi dati scaricati, sempre cifrati).
 // File dell'app dalla cache (versione = impronta della build), data.bin prima dalla rete.
-const CACHE = 'diario-953bc4a1678e';
-const SHELL = ["./", "app.js", "base.css", "carica.js", "d3.min.js", "goal.js", "icon-180.png", "icon-192.png", "icon-512.png", "icons.js", "index.html", "inline-1.js", "inline-2.js", "inline-3.js", "inline-4.js", "manifest.webmanifest", "neon.css", "page.css", "pages.js", "recovery.js", "run.js", "today.js"];
+const CACHE = 'diario-4940f338964f';
+const SHELL = ["./", "app.js", "base.css", "carica.js", "d3.min.js", "goal.js", "icon-180.png", "icon-192.png", "icon-512.png", "icons.js", "index.html", "inline-1.js", "inline-2.js", "inline-3.js", "inline-4.js", "manifest.webmanifest", "neon.css", "page.css", "pages.js", "perf.js", "recovery.js", "run.js", "today.js"];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

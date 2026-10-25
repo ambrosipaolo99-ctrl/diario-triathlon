@@ -73,21 +73,28 @@
   window.addEventListener('orientationchange', () => setTimeout(watchWidth, 250));
 
   // ------------------------------------------------------------ chiave in IndexedDB
-  const IDB = 'diario-triathlon', STORE = 'keys';
+  const IDB = 'diario-triathlon', STORE = 'keys', LOCAL = 'local';
   const idb = () => new Promise((res, rej) => {
-    const r = indexedDB.open(IDB, 1);
-    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+    const r = indexedDB.open(IDB, 2);
+    r.onupgradeneeded = () => {
+      for (const s of [STORE, LOCAL]) if (!r.result.objectStoreNames.contains(s)) r.result.createObjectStore(s);
+    };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
   });
-  const idbDo = async (mode, fn) => {
+  const idbDo = async (mode, fn, store = STORE) => {
     const db = await idb();
     return new Promise((res, rej) => {
-      const tx = db.transaction(STORE, mode);
-      const req = fn(tx.objectStore(STORE));
+      const tx = db.transaction(store, mode);
+      const req = fn(tx.objectStore(store));
       tx.oncomplete = () => res(req && req.result);
       tx.onerror = () => rej(tx.error);
     });
+  };
+  // archivio locale per i dati inseriti sul telefono (test neuromuscolare): non lascia mai il dispositivo
+  window.dtLocal = {
+    get: (k) => idbDo('readonly', (s) => s.get(k), LOCAL).catch(() => undefined),
+    set: (k, v) => idbDo('readwrite', (s) => s.put(v, k), LOCAL).catch(() => undefined),
   };
   const getKey = (id) => idbDo('readonly', (s) => s.get(id)).catch(() => null);
   const putKey = (id, k) => idbDo('readwrite', (s) => s.put(k, id)).catch(() => null);

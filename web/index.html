@@ -53,6 +53,11 @@
   <!-- OGGI -->
   <section class="gx-page" id="oggi" role="tabpanel" aria-labelledby="tab-oggi">
     <div class="td-wrap" id="allenamenti-oggi" data-source="today today_parts" hidden></div>
+    <div class="nx-card px-ready" id="prontezza-oggi" data-source="readiness goal_plan" hidden></div>
+    <div class="gx-grid">
+      <div class="nx-card" id="carico-vettori" data-source="load_vectors"></div>
+      <div class="nx-card px-fuel" id="carburante-oggi" data-source="fuel" hidden></div>
+    </div>
     <div class="ck-wrap" id="carica-oggi" data-source="goal_plan goals"></div>
     <div class="gx-card gl-today-card" id="obiettivo-oggi" data-source="goals race_estimate goal_plan">
       <h2>Obiettivo</h2>
@@ -139,6 +144,13 @@
         <div class="nx-card-head"><h3>La stima giorno per giorno</h3><span class="nx-note">ricalcolata con le corse fino a ogni data · in alto = più veloce</span></div>
         <div class="nx-chart" id="gl-est-chart" data-source="race_estimate"></div>
         <div class="nx-zone-legend gl-est-legend"></div>
+      </div>
+
+      <div class="nx-card" id="gl-taper-card" data-source="taper taper_meta" hidden>
+        <div class="nx-card-head"><h3>Forma verso la gara</h3><span class="nx-note">modello impulso-risposta (Banister) · indice 0–100 sugli ultimi 60 giorni · barre: carico di corsa</span></div>
+        <div class="nx-chart" id="gl-taper-chart"></div>
+        <div class="nx-zone-legend"><span><i style="background:#22e5ff"></i>forma (chiara = prevista dal piano)</span><span><i style="background:#b4ff39"></i>picco</span><span><i style="background:#ffb22e"></i>gara</span><span><i style="background:#9b7bff"></i>carico</span></div>
+        <div class="gl-taper-info"></div>
       </div>
 
       <div>
@@ -306,6 +318,7 @@
         <p class="nx-note">Sette aree valutate da 0 a 100; il voto della corsa è la loro media pesata.</p>
       </div>
       <div class="nx-sections"></div>
+      <div class="nx-grid nx-perf-run" data-source="run_load fuel biomech"></div>
       <div class="nx-card" id="nx-pace-card">
         <div class="nx-card-head"><h3>Passo</h3><span class="nx-note">min/km sulla distanza · in alto = più veloce</span></div>
         <div class="nx-chart" id="nx-chart-pace"></div>
@@ -388,6 +401,7 @@
 <script src="pages.js"></script>
 <script src="goal.js"></script>
 <script src="today.js"></script>
+<script src="perf.js"></script>
 <script src="carica.js"></script>
 </body>
 </html>
