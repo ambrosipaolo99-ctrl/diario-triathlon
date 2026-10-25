@@ -9,6 +9,7 @@ Le attivita' tornano nel formato di strava.import_activities (lo stesso del conn
 from __future__ import annotations
 
 import json
+import re
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -28,14 +29,24 @@ class StravaError(RuntimeError):
 def _token(data: dict) -> dict:
     r = requests.post(TOKEN_URL, data=data, timeout=TIMEOUT)
     if r.status_code != 200:
-        # niente corpo della risposta nel messaggio: potrebbe contenere dati dell'account
-        raise StravaError(f"token Strava rifiutato (HTTP {r.status_code})")
+        # solo i nomi dei campi rifiutati (es. code/invalid, client_id/invalid): nessun dato dell'account
+        try:
+            errs = ", ".join(f"{e.get('resource', '')}.{e.get('field', '')}={e.get('code', '')}" for e in r.json().get("errors", []))
+        except ValueError:
+            errs = ""
+        raise StravaError(f"token Strava rifiutato (HTTP {r.status_code}{': ' + errs if errs else ''})")
     j = r.json()
     return {"refresh_token": j["refresh_token"], "access_token": j["access_token"], "expires_at": j["expires_at"]}
 
 
+def clean_code(raw: str) -> str:
+    """Accetta il codice puro o l'indirizzo intero di ritorno (http://localhost/...?code=...&scope=...)."""
+    m = re.search(r"code=([0-9a-fA-F]+)", raw)
+    return m.group(1) if m else raw.strip()
+
+
 def exchange_code(client_id: str, client_secret: str, code: str) -> dict:
-    return _token({"client_id": client_id, "client_secret": client_secret, "code": code.strip(),
+    return _token({"client_id": client_id, "client_secret": client_secret, "code": clean_code(code),
                    "grant_type": "authorization_code"})
 
 
